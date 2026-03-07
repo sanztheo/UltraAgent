@@ -25,3 +25,9 @@ coverage/
 
 # Build cache
 *.tsbuildinfo
+
+# Reference repos (not part of UltraAgent)
+.ref/
+
+# Internal roadmap
+ROADMAP.md
