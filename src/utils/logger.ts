@@ -1,6 +1,6 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
-type LogLevel = "debug" | "info" | "warn" | "error";
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 0,
@@ -10,13 +10,13 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
 };
 
 const LEVEL_PREFIX: Record<LogLevel, string> = {
-  debug: chalk.gray("[DBG]"),
-  info: chalk.blue("[INF]"),
-  warn: chalk.yellow("[WRN]"),
-  error: chalk.red("[ERR]"),
+  debug: chalk.gray('[DBG]'),
+  info: chalk.blue('[INF]'),
+  warn: chalk.yellow('[WRN]'),
+  error: chalk.red('[ERR]'),
 };
 
-let currentLevel: LogLevel = "info";
+let currentLevel: LogLevel = 'info';
 
 export function setLogLevel(level: LogLevel): void {
   currentLevel = level;
@@ -28,36 +28,36 @@ function shouldLog(level: LogLevel): boolean {
 
 function formatMessage(level: LogLevel, msg: string, context?: string): string {
   const prefix = LEVEL_PREFIX[level];
-  const ctx = context ? chalk.gray(` [${context}]`) : "";
+  const ctx = context ? chalk.gray(` [${context}]`) : '';
   return `${prefix}${ctx} ${msg}`;
 }
 
 export const logger = {
   debug(msg: string, context?: string): void {
-    if (shouldLog("debug")) {
-      console.error(formatMessage("debug", msg, context));
+    if (shouldLog('debug')) {
+      console.error(formatMessage('debug', msg, context));
     }
   },
 
   info(msg: string, context?: string): void {
-    if (shouldLog("info")) {
-      console.error(formatMessage("info", msg, context));
+    if (shouldLog('info')) {
+      console.error(formatMessage('info', msg, context));
     }
   },
 
   warn(msg: string, context?: string): void {
-    if (shouldLog("warn")) {
-      console.error(formatMessage("warn", msg, context));
+    if (shouldLog('warn')) {
+      console.error(formatMessage('warn', msg, context));
     }
   },
 
   error(msg: string, context?: string): void {
-    if (shouldLog("error")) {
-      console.error(formatMessage("error", msg, context));
+    if (shouldLog('error')) {
+      console.error(formatMessage('error', msg, context));
     }
   },
 
   success(msg: string): void {
-    console.error(`${chalk.green("[OK]")} ${msg}`);
+    console.error(`${chalk.green('[OK]')} ${msg}`);
   },
 };
