@@ -6,10 +6,11 @@ All notable changes to UltraAgent are documented here.
 
 ### Added
 - **Pane-pipe IPC strategy** — workers execute non-interactive CLI commands directly in their tmux pane (`gemini -p ... | tee response.txt`). Output streams visibly, response captured via temp file. Replaces fragile conversation-file polling.
-- **Async task system** — `ultra_assign_task` returns immediately with a `taskId`, task runs in background. New MCP tools:
+- **Async task system** — `ultra_assign_task` and `ultra_ask_agent` both return immediately with a `taskId`. Tasks run in background; chef is auto-notified via tmux when done. New MCP tools:
   - `ultra_get_task_result(taskId)` — check status and get result when done
   - `ultra_list_tasks()` — list all tasks with status and elapsed time
   - `ultra_watch_agents()` — live snapshot of each worker's tmux pane (last 15 lines)
+- **Auto-notification** — `notifyChef()` sends task results directly to the chef's tmux pane when a background task completes. No polling needed.
 - **In-memory task store** (`src/mcp/task-store.ts`) — manages task lifecycle (running → done/error)
 
 ### Changed
