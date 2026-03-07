@@ -123,18 +123,9 @@ export async function startSession(
       resolvedCwd,
     );
 
-    const workerLaunchCmd = await workerAdapter.getInteractiveLaunchCommand({
-      role: "worker",
-      cwd: resolvedCwd,
-      permissionMode: config.permissions.worker_mode,
-    });
-
-    const paneInfo = await addPane(
-      sessionName,
-      workerName,
-      "worker",
-      workerLaunchCmd,
-    );
+    // Workers don't run interactive CLIs — their panes stay at shell prompt.
+    // Tasks are executed via non-interactive pipe commands sent to the pane.
+    const paneInfo = await addPane(sessionName, workerName, "worker");
     panes.push(paneInfo);
   }
 

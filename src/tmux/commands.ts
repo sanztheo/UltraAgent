@@ -1,3 +1,6 @@
+import { writeFile, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { execCommand, spawnInteractive } from "../utils/shell.js";
 import { logger } from "../utils/logger.js";
 
@@ -67,24 +70,40 @@ export async function tmuxSendKeys(
   paneTarget: string,
   keys: string,
 ): Promise<void> {
-  // Send text literally (-l flag prevents tmux from interpreting special keys)
-  const textResult = await execCommand("tmux", [
-    "send-keys",
-    "-t",
-    paneTarget,
-    "-l",
-    keys,
-  ]);
-  if (textResult.exitCode !== 0) {
-    logger.error(
-      `Failed to send keys to ${paneTarget}: ${textResult.stderr}`,
-      CTX,
-    );
-    throw new Error(`tmux send-keys failed: ${textResult.stderr}`);
+  // Use tmux paste-buffer for reliable text delivery (handles long text + special chars)
+  const tmpFile = join(
+    tmpdir(),
+    `ua-keys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.txt`,
+  );
+  await writeFile(tmpFile, keys, "utf-8");
+
+  try {
+    const loadResult = await execCommand("tmux", ["load-buffer", tmpFile]);
+    if (loadResult.exitCode !== 0) {
+      throw new Error(`tmux load-buffer failed: ${loadResult.stderr}`);
+    }
+
+    const pasteResult = await execCommand("tmux", [
+      "paste-buffer",
+      "-t",
+      paneTarget,
+      "-d",
+    ]);
+    if (pasteResult.exitCode !== 0) {
+      throw new Error(`tmux paste-buffer failed: ${pasteResult.stderr}`);
+    }
+  } finally {
+    try {
+      await unlink(tmpFile);
+    } catch {
+      /* cleanup best-effort */
+    }
   }
 
-  // Small delay so TUI apps (Codex/Ink, Gemini) can process the text
-  await new Promise((r) => setTimeout(r, 200));
+  // Delay proportional to text length so TUI apps (Codex/Ink, Gemini) can process the paste
+  const delayMs = Math.min(300 + Math.floor(keys.length / 50) * 50, 3_000);
+  logger.debug(`Paste delay: ${delayMs}ms for ${keys.length} chars`, CTX);
+  await new Promise((r) => setTimeout(r, delayMs));
 
   // Then press Enter separately
   const enterResult = await execCommand("tmux", [
@@ -122,14 +141,15 @@ export async function tmuxSelectLayout(
   logger.debug(`Applied layout "${layout}" to "${sessionName}"`, CTX);
 }
 
-export async function tmuxCapturePane(paneTarget: string): Promise<string> {
-  const result = await execCommand("tmux", [
-    "capture-pane",
-    "-t",
-    paneTarget,
-    "-p",
-    "-J",
-  ]);
+export async function tmuxCapturePane(
+  paneTarget: string,
+  options?: { fullScrollback?: boolean },
+): Promise<string> {
+  const args = ["capture-pane", "-t", paneTarget, "-p", "-J"];
+  if (options?.fullScrollback) {
+    args.push("-S", "-"); // from beginning of scrollback history
+  }
+  const result = await execCommand("tmux", args);
   if (result.exitCode !== 0) {
     logger.error(`Failed to capture pane ${paneTarget}: ${result.stderr}`, CTX);
     return "";

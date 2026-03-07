@@ -1,7 +1,7 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
 import { loadState } from "../orchestrator/state.js";
 import { logger } from "../utils/logger.js";
-import { askViaConversation } from "./conversation-ipc.js";
+import { askViaPanePipe } from "./pane-pipe-ipc.js";
 
 export class IpcCoordinator {
   constructor(
@@ -15,7 +15,6 @@ export class IpcCoordinator {
   private getWorkers(): AgentName[] {
     const state = loadState(process.cwd());
     if (state) return [...state.workers];
-    // Fallback if no state found
     return ["codex", "gemini"];
   }
 
@@ -23,7 +22,7 @@ export class IpcCoordinator {
     this.validatePayload(prompt);
     logger.info(`askAgent → ${agent}`, "ipc");
 
-    return askViaConversation(agent, prompt, {
+    return askViaPanePipe(agent, prompt, {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
@@ -38,7 +37,7 @@ export class IpcCoordinator {
 
     const results = await Promise.allSettled(
       targets.map((agent) =>
-        askViaConversation(agent, prompt, {
+        askViaPanePipe(agent, prompt, {
           timeoutMs: this.config.defaultTimeoutMs,
         }),
       ),
@@ -84,7 +83,7 @@ export class IpcCoordinator {
       parts.push("", `Relevant files: ${options.files.join(", ")}`);
     }
 
-    return askViaConversation(agent, parts.join("\n"), {
+    return askViaPanePipe(agent, parts.join("\n"), {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
@@ -99,7 +98,6 @@ export class IpcCoordinator {
   }
 }
 
-export { askViaConversation } from "./conversation-ipc.js";
-export { askViaPane } from "./pane-ipc.js";
+export { askViaPanePipe } from "./pane-pipe-ipc.js";
 export { askViaPipe } from "./pipe.js";
 export { handleCliBridge } from "./cli-bridge.js";

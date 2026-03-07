@@ -12,6 +12,19 @@ const CTX = "ipc:conv";
 
 // ─── Rate limit / error detection ───────────────────────────────────
 
+/** Patterns indicating the agent is back at idle prompt (done processing) */
+const IDLE_PATTERNS = [
+  /Type your message/i, // Gemini
+  /\$\s*$/, // Shell prompt
+  />\s*$/, // Generic prompt
+  /\?\s+for shortcuts/i, // Gemini shortcuts
+];
+
+function isPaneIdle(content: string): boolean {
+  const lastLines = content.split("\n").slice(-5).join("\n");
+  return IDLE_PATTERNS.some((p) => p.test(lastLines));
+}
+
 const ERROR_PATTERNS = [
   /you've hit your usage limit/i,
   /usage limit exceeded/i,
@@ -23,20 +36,6 @@ const ERROR_PATTERNS = [
   /credit balance is too low/i,
   /billing/i,
 ];
-
-async function checkPaneForErrors(paneId: string): Promise<string | undefined> {
-  const content = await tmuxCapturePane(paneId);
-  // Check last 15 lines for error patterns
-  const lastLines = content.split("\n").slice(-15).join("\n");
-  for (const pattern of ERROR_PATTERNS) {
-    if (pattern.test(lastLines)) {
-      // Extract the matching line for context
-      const match = lastLines.split("\n").find((line) => pattern.test(line));
-      return match?.trim() ?? "Rate limit or error detected";
-    }
-  }
-  return undefined;
-}
 
 // ─── Conversation file locators ─────────────────────────────────────
 
@@ -130,9 +129,17 @@ async function findActiveFile(
       return findMostRecentFile(dir, [".jsonl"], 1);
     }
     case "gemini": {
+      // Try project-specific path first
       const projectName = await resolveGeminiProjectName(cwd);
       const chatsDir = join(home, ".gemini", "tmp", projectName, "chats");
-      return findMostRecentFile(chatsDir, [".json"], 1);
+      logger.debug(`Gemini: trying project path ${chatsDir}`, CTX);
+      const projectFile = await findMostRecentFile(chatsDir, [".json"], 1);
+      if (projectFile) return projectFile;
+
+      // Fallback: search all project directories for recent session files
+      logger.debug("Gemini: project path miss, searching all tmp dirs", CTX);
+      const tmpDir = join(home, ".gemini", "tmp");
+      return findMostRecentFile(tmpDir, [".json"], 3);
     }
     case "codex": {
       // Try SQLite first (most reliable)
@@ -265,6 +272,61 @@ function parseCodexNewLines(lines: string[]): string[] {
   return texts;
 }
 
+// ─── Pane capture fallback ─────────────────────────────────────────
+
+/** Strip ANSI escape sequences from terminal output */
+function stripAnsi(text: string): string {
+  // biome-ignore lint: complex regex for ANSI stripping
+  return text
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b\][^\x07]*\x07/g, "");
+}
+
+/**
+ * Fallback: capture full tmux pane scrollback, find our prompt, and extract
+ * everything between our prompt and the next idle prompt indicator.
+ */
+async function fallbackPaneCapture(
+  paneId: string,
+  sentPrompt: string,
+): Promise<string> {
+  const raw = await tmuxCapturePane(paneId, { fullScrollback: true });
+  const content = stripAnsi(raw);
+
+  // Find the prompt we sent (match first 60 chars to account for wrapping)
+  const needle = sentPrompt.slice(0, 60);
+  const promptIdx = content.indexOf(needle);
+  if (promptIdx === -1) {
+    logger.debug("Fallback: could not find sent prompt in pane", CTX);
+    return "";
+  }
+
+  // Extract everything after our prompt
+  let afterPrompt = content.slice(promptIdx + needle.length);
+
+  // Trim up to end of the prompt line
+  const firstNewline = afterPrompt.indexOf("\n");
+  if (firstNewline !== -1) {
+    afterPrompt = afterPrompt.slice(firstNewline + 1);
+  }
+
+  // Remove trailing idle prompt indicators and status lines
+  const idlePatterns = [
+    /\*\s*Type your message.*$/s, // Gemini idle prompt
+    />\s*$/s, // Claude/Codex prompt
+    /\?\s+for shortcuts.*$/s, // Gemini shortcuts hint
+  ];
+  for (const pattern of idlePatterns) {
+    afterPrompt = afterPrompt.replace(pattern, "");
+  }
+
+  const result = afterPrompt.trim();
+  if (result.length > 0) {
+    logger.info(`Fallback pane capture: ${result.length} chars`, CTX);
+  }
+  return result;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────
 
 export async function askViaConversation(
@@ -325,17 +387,42 @@ export async function askViaConversation(
   while (Date.now() - start < timeout) {
     pollCount++;
 
-    // Periodically check tmux pane for rate limits / errors
+    // Periodically check tmux pane for rate limits / errors / idle state
     if (pollCount % ERROR_CHECK_INTERVAL === 0) {
-      const paneError = await checkPaneForErrors(pane.paneId);
-      if (paneError) {
-        logger.warn(`${agentName} error detected: ${paneError}`, CTX);
-        return {
-          agent: agentName,
-          content: `Error: ${paneError}`,
-          exitCode: 1,
-          durationMs: Date.now() - start,
-        };
+      const paneContent = await tmuxCapturePane(pane.paneId);
+      // Check for errors first
+      const lastLines = paneContent.split("\n").slice(-15).join("\n");
+      for (const pattern of ERROR_PATTERNS) {
+        if (pattern.test(lastLines)) {
+          const match = lastLines
+            .split("\n")
+            .find((line) => pattern.test(line));
+          const paneError = match?.trim() ?? "Rate limit or error detected";
+          logger.warn(`${agentName} error detected: ${paneError}`, CTX);
+          return {
+            agent: agentName,
+            content: `Error: ${paneError}`,
+            exitCode: 1,
+            durationMs: Date.now() - start,
+          };
+        }
+      }
+
+      // Check if agent is back at idle prompt (finished processing)
+      // Only after enough time for the agent to have started + finished
+      if (pollCount > ERROR_CHECK_INTERVAL * 2 && isPaneIdle(paneContent)) {
+        if (!responseText) {
+          logger.info(
+            `${agentName} is idle but no conv file response — using pane fallback`,
+            CTX,
+          );
+          responseText = await fallbackPaneCapture(pane.paneId, flatPrompt);
+          if (responseText) break;
+        } else {
+          // We have a response and agent is idle — response is complete
+          logger.debug(`${agentName} is idle and response captured`, CTX);
+          break;
+        }
       }
     }
 
@@ -392,8 +479,16 @@ export async function askViaConversation(
   }
 
   if (!responseText) {
-    logger.warn(`No response from ${agentName} conversation file`, CTX);
-    responseText = "[No response captured from conversation file]";
+    logger.warn(
+      `No conv file response from ${agentName}, trying pane capture fallback`,
+      CTX,
+    );
+    responseText = await fallbackPaneCapture(pane.paneId, flatPrompt);
+  }
+
+  if (!responseText) {
+    logger.warn(`All capture methods failed for ${agentName}`, CTX);
+    responseText = "[No response captured]";
   }
 
   const durationMs = Date.now() - start;

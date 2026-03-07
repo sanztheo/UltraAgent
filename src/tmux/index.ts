@@ -54,12 +54,14 @@ export async function addPane(
   sessionName: string,
   agent: AgentName,
   role: AgentRole,
-  command: ShellCommand,
+  command?: ShellCommand,
 ): Promise<PaneInfo> {
   const paneId = await tmuxSplitWindow(sessionName, { vertical: true });
 
-  const fullCommand = buildCommandString(command);
-  await tmuxSendKeys(paneId, fullCommand);
+  if (command) {
+    const fullCommand = buildCommandString(command);
+    await tmuxSendKeys(paneId, fullCommand);
+  }
 
   const ready = await waitForPaneReady(paneId, { timeoutMs: 5_000 });
 
