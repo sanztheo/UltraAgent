@@ -38,7 +38,8 @@ export class GeminiAdapter extends BaseAdapter {
     command: string,
     args: string[],
   ): Promise<void> {
-    const mcpArgs = ["mcp", "add", name, "--", command, ...args];
+    // Gemini CLI: no "--" separator, and use --trust to auto-approve tool calls
+    const mcpArgs = ["mcp", "add", "--trust", name, command, ...args];
     logger.debug(
       `Registering MCP server: ${this.binary} ${mcpArgs.join(" ")}`,
       this.name,
