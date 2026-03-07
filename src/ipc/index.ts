@@ -1,6 +1,6 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
 import { logger } from "../utils/logger.js";
-import { askViaPane } from "./pane-ipc.js";
+import { askViaConversation } from "./conversation-ipc.js";
 
 const ALL_AGENTS: readonly AgentName[] = ["claude", "codex", "gemini"];
 
@@ -16,7 +16,7 @@ export class IpcCoordinator {
     this.validatePayload(prompt);
     logger.info(`askAgent → ${agent}`, "ipc");
 
-    return askViaPane(agent, prompt, {
+    return askViaConversation(agent, prompt, {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
@@ -32,7 +32,7 @@ export class IpcCoordinator {
     const responses: AgentResponse[] = [];
     for (const agent of targets) {
       try {
-        const response = await askViaPane(agent, prompt, {
+        const response = await askViaConversation(agent, prompt, {
           timeoutMs: this.config.defaultTimeoutMs,
         });
         responses.push(response);
@@ -76,7 +76,7 @@ export class IpcCoordinator {
       parts.push("", `Relevant files: ${options.files.join(", ")}`);
     }
 
-    return askViaPane(agent, parts.join("\n"), {
+    return askViaConversation(agent, parts.join("\n"), {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
@@ -91,6 +91,7 @@ export class IpcCoordinator {
   }
 }
 
+export { askViaConversation } from "./conversation-ipc.js";
 export { askViaPane } from "./pane-ipc.js";
 export { askViaPipe } from "./pipe.js";
 export { handleCliBridge } from "./cli-bridge.js";
