@@ -1,7 +1,7 @@
-export type AgentName = "claude" | "codex" | "gemini";
-export type AgentRole = "chef" | "worker";
-export type PermissionMode = "default" | "auto" | "yolo";
-export type TmuxLayout = "tiled" | "main-vertical" | "main-horizontal";
+export type AgentName = 'claude' | 'codex' | 'gemini';
+export type AgentRole = 'chef' | 'worker';
+export type PermissionMode = 'default' | 'auto' | 'yolo';
+export type TmuxLayout = 'tiled' | 'main-vertical' | 'main-horizontal';
 
 export interface TmuxConfig {
   readonly layout: TmuxLayout;
@@ -36,7 +36,7 @@ export interface LaunchOptions {
 export interface AskOptions {
   readonly cwd?: string;
   readonly timeoutMs?: number;
-  readonly outputFormat?: "json" | "text";
+  readonly outputFormat?: 'json' | 'text';
 }
 
 export interface AgentResponse {
