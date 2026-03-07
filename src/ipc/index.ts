@@ -1,7 +1,6 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
 import { logger } from "../utils/logger.js";
 import { askViaPane } from "./pane-ipc.js";
-import { askViaPipe } from "./pipe.js";
 
 const ALL_AGENTS: readonly AgentName[] = ["claude", "codex", "gemini"];
 
@@ -17,7 +16,9 @@ export class IpcCoordinator {
     this.validatePayload(prompt);
     logger.info(`askAgent → ${agent}`, "ipc");
 
-    return this.ask(agent, prompt);
+    return askViaPane(agent, prompt, {
+      timeoutMs: this.config.defaultTimeoutMs,
+    });
   }
 
   async broadcast(
@@ -28,11 +29,12 @@ export class IpcCoordinator {
     const targets = agents ?? [...ALL_AGENTS];
     logger.info(`broadcast → [${targets.join(", ")}]`, "ipc");
 
-    // Broadcast sequentially to avoid overlapping pane inputs
     const responses: AgentResponse[] = [];
     for (const agent of targets) {
       try {
-        const response = await this.ask(agent, prompt);
+        const response = await askViaPane(agent, prompt, {
+          timeoutMs: this.config.defaultTimeoutMs,
+        });
         responses.push(response);
       } catch (error) {
         logger.warn(
@@ -74,24 +76,9 @@ export class IpcCoordinator {
       parts.push("", `Relevant files: ${options.files.join(", ")}`);
     }
 
-    return this.ask(agent, parts.join("\n"));
-  }
-
-  private async ask(agent: AgentName, prompt: string): Promise<AgentResponse> {
-    // Try pane IPC first (sends to visible tmux pane), fall back to pipe
-    try {
-      return await askViaPane(agent, prompt, {
-        timeoutMs: this.config.defaultTimeoutMs,
-      });
-    } catch (error) {
-      logger.warn(
-        `Pane IPC failed for ${agent}, falling back to pipe: ${error instanceof Error ? error.message : "Unknown"}`,
-        "ipc",
-      );
-      return askViaPipe(agent, prompt, {
-        timeoutMs: this.config.defaultTimeoutMs,
-      });
-    }
+    return askViaPane(agent, parts.join("\n"), {
+      timeoutMs: this.config.defaultTimeoutMs,
+    });
   }
 
   private validatePayload(data: string): void {
