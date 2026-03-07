@@ -1,24 +1,19 @@
-import * as p from "@clack/prompts";
-import chalk from "chalk";
-import { loadConfig, saveConfig, configExists } from "../../config/index.js";
-import { which } from "../../utils/shell.js";
-import type {
-  AgentName,
-  PermissionMode,
-  TmuxLayout,
-  UltraAgentConfig,
-} from "../../config/types.js";
+import * as p from '@clack/prompts';
+import chalk from 'chalk';
+import { configExists, loadConfig, saveConfig } from '../../config/index.js';
+import type { AgentName, PermissionMode, TmuxLayout, UltraAgentConfig } from '../../config/types.js';
+import { which } from '../../utils/shell.js';
 
-const ALL_AGENTS: AgentName[] = ["claude", "codex", "gemini"];
+const ALL_AGENTS: AgentName[] = ['claude', 'codex', 'gemini'];
 
 type MenuAction =
-  | "chef"
-  | "layout"
-  | "worker-mode"
-  | "chef-mode"
-  | "save"
-  | "save-global"
-  | "discard"
+  | 'chef'
+  | 'layout'
+  | 'worker-mode'
+  | 'chef-mode'
+  | 'save'
+  | 'save-global'
+  | 'discard'
   | `toggle:${AgentName}`;
 
 function buildMenuOptions(
@@ -29,7 +24,7 @@ function buildMenuOptions(
 
   const items: Array<{ value: MenuAction; label: string; hint?: string }> = [
     {
-      value: "chef",
+      value: 'chef',
       label: `  Chef              ${chalk.cyan.bold(config.chef)}`,
     },
   ];
@@ -38,43 +33,41 @@ function buildMenuOptions(
   for (const agent of available) {
     if (agent === config.chef) continue;
     const active = workers.includes(agent);
-    const icon = active ? chalk.green("●") : chalk.dim("○");
+    const icon = active ? chalk.green('●') : chalk.dim('○');
     const name = active ? chalk.white(agent) : chalk.dim(agent);
     items.push({
       value: `toggle:${agent}`,
       label: `  ${icon} ${name}`,
-      hint: active
-        ? "enabled — select to disable"
-        : "disabled — select to enable",
+      hint: active ? 'enabled — select to disable' : 'disabled — select to enable',
     });
   }
 
   items.push(
     {
-      value: "layout",
+      value: 'layout',
       label: `  Layout            ${chalk.yellow(config.tmux.layout)}`,
     },
     {
-      value: "chef-mode",
+      value: 'chef-mode',
       label: `  Chef mode         ${chalk.magenta(config.permissions.chef_mode)}`,
     },
     {
-      value: "worker-mode",
+      value: 'worker-mode',
       label: `  Worker mode       ${chalk.magenta(config.permissions.worker_mode)}`,
     },
     {
-      value: "save",
-      label: chalk.green.bold("  ↵ Save to project"),
-      hint: ".ultraagent.json",
+      value: 'save',
+      label: chalk.green.bold('  ↵ Save to project'),
+      hint: '.ultraagent.json',
     },
     {
-      value: "save-global",
-      label: chalk.green("  ↵ Save globally"),
-      hint: "~/.ultraagent/config.json",
+      value: 'save-global',
+      label: chalk.green('  ↵ Save globally'),
+      hint: '~/.ultraagent/config.json',
     },
     {
-      value: "discard",
-      label: chalk.dim("    Discard & exit"),
+      value: 'discard',
+      label: chalk.dim('    Discard & exit'),
     },
   );
 
@@ -85,7 +78,7 @@ export async function configCommand(): Promise<void> {
   const cwd = process.cwd();
 
   if (!configExists(cwd)) {
-    console.log(chalk.yellow("No config found. Run `ultraagent init` first."));
+    console.log(chalk.yellow('No config found. Run `ultraagent init` first.'));
     process.exit(1);
   }
 
@@ -97,36 +90,34 @@ export async function configCommand(): Promise<void> {
     if (await which(name)) available.push(name);
   }
 
-  p.intro(chalk.bold("UltraAgent Config"));
+  p.intro(chalk.bold('UltraAgent Config'));
 
   let dirty = false;
 
   while (true) {
     const action = await p.select<MenuAction>({
-      message: dirty ? chalk.yellow("Settings (modified)") : "Settings",
+      message: dirty ? chalk.yellow('Settings (modified)') : 'Settings',
       options: buildMenuOptions(config, available),
     });
 
     if (p.isCancel(action)) {
       if (dirty) {
         const confirm = await p.confirm({
-          message: "Discard unsaved changes?",
+          message: 'Discard unsaved changes?',
         });
         if (p.isCancel(confirm) || !confirm) continue;
       }
-      p.cancel("Discarded");
+      p.cancel('Discarded');
       return;
     }
 
     // Worker toggle — instant, no sub-menu
-    if (action.startsWith("toggle:")) {
+    if (action.startsWith('toggle:')) {
       const agent = action.slice(7) as AgentName;
       const workers = config.agents.filter((a) => a !== config.chef);
       const isActive = workers.includes(agent);
 
-      const newWorkers = isActive
-        ? workers.filter((w) => w !== agent)
-        : [...workers, agent];
+      const newWorkers = isActive ? workers.filter((w) => w !== agent) : [...workers, agent];
 
       config = { ...config, agents: [config.chef, ...newWorkers] };
       dirty = true;
@@ -134,44 +125,42 @@ export async function configCommand(): Promise<void> {
     }
 
     switch (action) {
-      case "chef": {
+      case 'chef': {
         const chef = await p.select({
-          message: "Chef",
+          message: 'Chef',
           options: available.map((name) => ({
             value: name,
             label: name,
-            hint: name === config.chef ? "current" : undefined,
+            hint: name === config.chef ? 'current' : undefined,
           })),
           initialValue: config.chef,
         });
         if (!p.isCancel(chef) && chef !== config.chef) {
-          const workers = config.agents.filter(
-            (a) => a !== config.chef && a !== chef,
-          );
+          const workers = config.agents.filter((a) => a !== config.chef && a !== chef);
           config = { ...config, chef, agents: [chef, ...workers] };
           dirty = true;
         }
         break;
       }
 
-      case "layout": {
+      case 'layout': {
         const layout = await p.select({
-          message: "Layout",
+          message: 'Layout',
           options: [
             {
-              value: "main-vertical" as TmuxLayout,
-              label: "Main Vertical",
-              hint: "chef left, workers right",
+              value: 'main-vertical' as TmuxLayout,
+              label: 'Main Vertical',
+              hint: 'chef left, workers right',
             },
             {
-              value: "main-horizontal" as TmuxLayout,
-              label: "Main Horizontal",
-              hint: "chef top, workers bottom",
+              value: 'main-horizontal' as TmuxLayout,
+              label: 'Main Horizontal',
+              hint: 'chef top, workers bottom',
             },
             {
-              value: "tiled" as TmuxLayout,
-              label: "Tiled",
-              hint: "equal-sized panes",
+              value: 'tiled' as TmuxLayout,
+              label: 'Tiled',
+              hint: 'equal-sized panes',
             },
           ],
           initialValue: config.tmux.layout,
@@ -183,11 +172,8 @@ export async function configCommand(): Promise<void> {
         break;
       }
 
-      case "chef-mode": {
-        const mode = await selectMode(
-          "Chef permission mode",
-          config.permissions.chef_mode,
-        );
+      case 'chef-mode': {
+        const mode = await selectMode('Chef permission mode', config.permissions.chef_mode);
         if (mode) {
           config = {
             ...config,
@@ -198,11 +184,8 @@ export async function configCommand(): Promise<void> {
         break;
       }
 
-      case "worker-mode": {
-        const mode = await selectMode(
-          "Worker permission mode",
-          config.permissions.worker_mode,
-        );
+      case 'worker-mode': {
+        const mode = await selectMode('Worker permission mode', config.permissions.worker_mode);
         if (mode) {
           config = {
             ...config,
@@ -213,53 +196,50 @@ export async function configCommand(): Promise<void> {
         break;
       }
 
-      case "save": {
-        saveConfig(config, "project", cwd);
-        p.outro(chalk.green("Saved to .ultraagent.json"));
+      case 'save': {
+        saveConfig(config, 'project', cwd);
+        p.outro(chalk.green('Saved to .ultraagent.json'));
         return;
       }
 
-      case "save-global": {
-        saveConfig(config, "global", cwd);
-        p.outro(chalk.green("Saved to ~/.ultraagent/config.json"));
+      case 'save-global': {
+        saveConfig(config, 'global', cwd);
+        p.outro(chalk.green('Saved to ~/.ultraagent/config.json'));
         return;
       }
 
-      case "discard": {
+      case 'discard': {
         if (dirty) {
           const confirm = await p.confirm({
-            message: "Discard unsaved changes?",
+            message: 'Discard unsaved changes?',
           });
           if (p.isCancel(confirm) || !confirm) break;
         }
-        p.outro(chalk.dim("No changes saved."));
+        p.outro(chalk.dim('No changes saved.'));
         return;
       }
     }
   }
 }
 
-async function selectMode(
-  message: string,
-  current: PermissionMode,
-): Promise<PermissionMode | undefined> {
+async function selectMode(message: string, current: PermissionMode): Promise<PermissionMode | undefined> {
   const mode = await p.select({
     message,
     options: [
       {
-        value: "default" as PermissionMode,
-        label: "Default",
-        hint: "ask permission for each action",
+        value: 'default' as PermissionMode,
+        label: 'Default',
+        hint: 'ask permission for each action',
       },
       {
-        value: "auto" as PermissionMode,
-        label: "Auto",
-        hint: "auto-approve safe edits",
+        value: 'auto' as PermissionMode,
+        label: 'Auto',
+        hint: 'auto-approve safe edits',
       },
       {
-        value: "yolo" as PermissionMode,
-        label: "YOLO",
-        hint: "skip all permission checks",
+        value: 'yolo' as PermissionMode,
+        label: 'YOLO',
+        hint: 'skip all permission checks',
       },
     ],
     initialValue: current,
