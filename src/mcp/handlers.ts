@@ -1,7 +1,7 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
 import type { IpcCoordinator } from "../ipc/index.js";
 import { createTask, completeTask, getTask, listTasks } from "./task-store.js";
-import { tmuxCapturePane } from "../tmux/commands.js";
+import { tmuxCapturePane, tmuxSendKeys } from "../tmux/commands.js";
 import { loadState } from "../orchestrator/state.js";
 import { logger } from "../utils/logger.js";
 
@@ -94,38 +94,80 @@ export function createAssignTaskHandler(coordinator: IpcCoordinator) {
     files?: string[];
   }): Promise<{ content: Array<{ type: "text"; text: string }> }> => {
     try {
-      // Create task entry and return immediately — work runs in background
       const entry = createTask(args.agent, args.task);
 
-      // Fire-and-forget: run in background, update task store on completion
+      // Fire-and-forget: run in background, notify chef when done
       coordinator
         .assignTask(args.agent, args.task, {
           canCode: args.can_code,
           files: args.files,
         })
-        .then((result) => completeTask(entry.id, result))
-        .catch((error) => {
+        .then(async (result) => {
+          completeTask(entry.id, result);
+          await notifyChef(entry.id, args.agent, result);
+        })
+        .catch(async (error) => {
           const message =
             error instanceof Error ? error.message : String(error);
           logger.warn(`Task ${entry.id} failed: ${message}`, "mcp");
-          completeTask(entry.id, {
+          const errorResult: AgentResponse = {
             agent: args.agent,
             content: `Error: ${message}`,
             exitCode: 1,
             durationMs: Date.now() - entry.startedAt,
-          });
+          };
+          completeTask(entry.id, errorResult);
+          await notifyChef(entry.id, args.agent, errorResult);
         });
 
       return jsonResponse({
         taskId: entry.id,
         agent: entry.agent,
         status: "running",
-        message: `Task assigned to ${args.agent}. Use ultra_get_task_result("${entry.id}") to get the result when ready, or ultra_list_tasks() to monitor progress.`,
+        message: `Task assigned to ${args.agent}. You will be notified automatically when it completes — no need to poll or wait.`,
       });
     } catch (error) {
       return errorResponse(error);
     }
   };
+}
+
+/** Send the task result directly to the chef's tmux pane as a message */
+async function notifyChef(
+  taskId: string,
+  agent: AgentName,
+  result: AgentResponse,
+): Promise<void> {
+  try {
+    const state = loadState(process.cwd());
+    if (!state) return;
+
+    const chefPane = state.panes.find((p) => p.role === "chef");
+    if (!chefPane) return;
+
+    const status = result.exitCode === 0 ? "done" : "error";
+    const content =
+      result.content.length > 2000
+        ? `${result.content.slice(0, 2000)}\n...(truncated)`
+        : result.content;
+
+    const notification = [
+      `[UltraAgent] Worker ${agent} finished task ${taskId} (${status}).`,
+      `Result:`,
+      content,
+    ].join(" ");
+
+    // Small delay to avoid sending while chef is mid-response
+    await new Promise((r) => setTimeout(r, 1_000));
+    await tmuxSendKeys(chefPane.paneId, notification);
+
+    logger.info(`Chef notified about task ${taskId}`, "mcp");
+  } catch (error) {
+    logger.warn(
+      `Failed to notify chef: ${error instanceof Error ? error.message : String(error)}`,
+      "mcp",
+    );
+  }
 }
 
 export function createGetTaskResultHandler() {
