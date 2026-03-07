@@ -28,6 +28,10 @@ export function statePath(cwd: string): string {
   return join(stateDir(cwd), "state.json");
 }
 
+export function tasksDir(cwd: string): string {
+  return join(stateDir(cwd), "tasks");
+}
+
 export function scriptsDir(): string {
   return join(globalConfigDir(), "scripts");
 }

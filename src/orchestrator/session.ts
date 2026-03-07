@@ -102,7 +102,7 @@ export async function startSession(
     ready: true,
   });
 
-  // Step 5: Inject instructions and launch workers
+  // Step 5: Inject instructions, register MCP, and launch workers interactively
   for (const workerName of workers) {
     const workerAdapter = createAdapter(workerName);
     const available = await workerAdapter.isAvailable();
@@ -123,9 +123,29 @@ export async function startSession(
       resolvedCwd,
     );
 
-    // Workers don't run interactive CLIs — their panes stay at shell prompt.
-    // Tasks are executed via non-interactive pipe commands sent to the pane.
+    // Register MCP server with each worker so they can call ultra_report_complete
+    try {
+      await workerAdapter.registerMcpServer("ultraagent", mcpCommand, mcpArgs);
+      logger.info(`MCP server registered for worker ${workerName}`, "session");
+    } catch (error) {
+      logger.warn(
+        `Failed to register MCP for ${workerName}: ${error instanceof Error ? error.message : String(error)}`,
+        "session",
+      );
+    }
+
+    // Create pane and launch worker's interactive CLI
     const paneInfo = await addPane(sessionName, workerName, "worker");
+    const workerLaunchCmd = await workerAdapter.getInteractiveLaunchCommand({
+      role: "worker",
+      cwd: resolvedCwd,
+      permissionMode: config.permissions.worker_mode,
+    });
+    const workerCmdStr = [
+      workerLaunchCmd.command,
+      ...workerLaunchCmd.args,
+    ].join(" ");
+    await tmuxSendKeys(paneInfo.paneId, workerCmdStr);
     panes.push(paneInfo);
   }
 

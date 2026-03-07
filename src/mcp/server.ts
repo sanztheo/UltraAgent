@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { IpcCoordinator } from "../ipc/index.js";
 import { logger } from "../utils/logger.js";
 import {
   createAskAgentHandler,
@@ -8,27 +7,24 @@ import {
   createBroadcastHandler,
   createGetTaskResultHandler,
   createListTasksHandler,
+  createReportCompleteHandler,
   createWatchAgentsHandler,
 } from "./handlers.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const MAX_PAYLOAD_BYTES = 1_024 * 1_024; // 1 MB
-
 export async function startMcpServer(): Promise<void> {
-  const coordinator = new IpcCoordinator({
-    defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
-    maxPayloadBytes: MAX_PAYLOAD_BYTES,
-  });
-
   const server = new McpServer(
-    { name: "ultraagent", version: "0.2.0" },
+    { name: "ultraagent", version: "0.3.0" },
     { capabilities: { tools: {} } },
   );
 
-  // Sync tools
-  const askHandler = createAskAgentHandler(coordinator);
-  const broadcastHandler = createBroadcastHandler(coordinator);
+  const askHandler = createAskAgentHandler();
+  const broadcastHandler = createBroadcastHandler();
+  const assignHandler = createAssignTaskHandler();
+  const getResultHandler = createGetTaskResultHandler();
+  const listHandler = createListTasksHandler();
+  const watchHandler = createWatchAgentsHandler();
+  const reportHandler = createReportCompleteHandler();
 
   server.tool(
     "ultra_ask_agent",
@@ -43,12 +39,6 @@ export async function startMcpServer(): Promise<void> {
     TOOL_DEFINITIONS.ultra_broadcast.inputSchema,
     async (args) => broadcastHandler(args),
   );
-
-  // Async task tools
-  const assignHandler = createAssignTaskHandler(coordinator);
-  const getResultHandler = createGetTaskResultHandler();
-  const listHandler = createListTasksHandler();
-  const watchHandler = createWatchAgentsHandler();
 
   server.tool(
     "ultra_assign_task",
@@ -76,6 +66,13 @@ export async function startMcpServer(): Promise<void> {
     TOOL_DEFINITIONS.ultra_watch_agents.description,
     TOOL_DEFINITIONS.ultra_watch_agents.inputSchema,
     async () => watchHandler(),
+  );
+
+  server.tool(
+    "ultra_report_complete",
+    TOOL_DEFINITIONS.ultra_report_complete.description,
+    TOOL_DEFINITIONS.ultra_report_complete.inputSchema,
+    async (args) => reportHandler(args),
   );
 
   const transport = new StdioServerTransport();

@@ -35,35 +35,52 @@ export const getTaskResultInputSchema = {
     .describe("The task ID returned by ultra_assign_task"),
 };
 
+export const reportCompleteInputSchema = {
+  task_id: z.string().min(1).describe("The task ID to report as complete"),
+  result: z
+    .string()
+    .min(1)
+    .describe("The task result content (your complete response)"),
+  exit_code: z
+    .number()
+    .optional()
+    .describe("Exit code: 0 = success, non-zero = error. Defaults to 0."),
+};
+
 export const TOOL_DEFINITIONS = {
   ultra_ask_agent: {
     description:
-      "Ask a specific AI CLI agent a question and wait for its response (synchronous, for quick questions).",
+      "Send a question to a worker agent. Returns immediately with a taskId — the worker will call ultra_report_complete when done, and the chef gets notified automatically.",
     inputSchema: askAgentInputSchema,
   },
   ultra_broadcast: {
     description:
-      "Broadcast a prompt to all worker agents simultaneously and wait for all responses.",
+      "Send a prompt to all worker agents simultaneously. Returns immediately with taskIds for each worker.",
     inputSchema: broadcastInputSchema,
   },
   ultra_assign_task: {
     description:
-      "Assign a task to a worker agent. Returns immediately with a taskId — the task runs in the background. Use ultra_get_task_result to check progress and retrieve the result.",
+      "Assign a structured task to a worker agent. Returns immediately with a taskId — the worker will call ultra_report_complete when done.",
     inputSchema: assignTaskInputSchema,
   },
   ultra_get_task_result: {
     description:
-      "Wait for a background task to finish and return its result. This call blocks until the task is done — call it once, not in a loop.",
+      "Wait for a background task to finish and return its result. Blocks until the worker calls ultra_report_complete.",
     inputSchema: getTaskResultInputSchema,
   },
   ultra_list_tasks: {
     description:
-      "List all tasks with their current status, agent, and elapsed time. Useful to monitor what workers are doing.",
+      "List all tasks with their current status, agent, and elapsed time.",
     inputSchema: {},
   },
   ultra_watch_agents: {
     description:
-      "Get a live snapshot of each worker's tmux pane (last 15 lines). See what each agent is currently doing.",
+      "Get a live snapshot of each worker's tmux pane (last 15 lines).",
     inputSchema: {},
+  },
+  ultra_report_complete: {
+    description:
+      "Report task completion. Workers MUST call this tool when they finish an assigned task. This stores the result and notifies the chef automatically.",
+    inputSchema: reportCompleteInputSchema,
   },
 } as const;

@@ -14,9 +14,13 @@ export function generateChefInstructions(options: {
 
 You have access to these MCP tools for coordinating with workers:
 
-- \`ultra_ask_agent(agent, prompt)\` - Send a prompt to a specific worker and get a response
-- \`ultra_broadcast(prompt)\` - Send the same prompt to all workers simultaneously
-- \`ultra_assign_task(agent, task, can_code, files)\` - Assign a structured task to a worker
+- \`ultra_ask_agent(agent, prompt)\` - Send a question to a worker. Returns immediately — the worker will report back automatically.
+- \`ultra_broadcast(prompt)\` - Send a prompt to all workers simultaneously. Returns immediately.
+- \`ultra_assign_task(agent, task, can_code, files)\` - Assign a structured task to a worker. Returns immediately.
+- \`ultra_list_tasks()\` - List all tasks with their status.
+- \`ultra_watch_agents()\` - See what each worker is currently doing (tmux snapshot).
+
+**Important:** All tools return immediately. Workers call \`ultra_report_complete\` when done, which sends you a notification automatically. Do NOT poll or wait — just continue working and you'll be notified.
 
 Use MCP tools as the primary communication method.`
     : `## Communication (Shell Scripts)
