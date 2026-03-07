@@ -3,6 +3,7 @@ import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
+import { configShowCommand, configSetCommand } from "./commands/config.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -33,6 +34,23 @@ export function createProgram(): Command {
     .command("init")
     .description("Interactive setup wizard")
     .action(initCommand);
+
+  const configCmd = program
+    .command("config")
+    .description("Show or modify configuration");
+
+  configCmd
+    .command("show", { isDefault: true })
+    .description("Show current configuration")
+    .action(configShowCommand);
+
+  configCmd
+    .command("set <key> <value>")
+    .description(
+      "Set a config value (chef, workers, layout, worker-mode, chef-mode, timeout)",
+    )
+    .option("-g, --global", "Save to global config instead of project")
+    .action(configSetCommand);
 
   return program;
 }
