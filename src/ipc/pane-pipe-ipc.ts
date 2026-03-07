@@ -1,13 +1,13 @@
-import { writeFile, readFile, unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { tmuxSendKeys, tmuxCapturePane } from "../tmux/commands.js";
-import { loadState } from "../orchestrator/state.js";
-import { sleep } from "../utils/process.js";
-import { logger } from "../utils/logger.js";
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { loadState } from '../orchestrator/state.js';
+import { tmuxCapturePane, tmuxSendKeys } from '../tmux/commands.js';
+import { logger } from '../utils/logger.js';
+import { sleep } from '../utils/process.js';
 
-const CTX = "ipc:pane-pipe";
+const CTX = 'ipc:pane-pipe';
 
 const ERROR_PATTERNS = [
   /usage limit/i,
@@ -21,18 +21,14 @@ const ERROR_PATTERNS = [
 ];
 
 /** Build the shell command to run the agent non-interactively */
-function buildAgentCommand(
-  agent: AgentName,
-  promptFile: string,
-  responseFile: string,
-): string {
+function buildAgentCommand(agent: AgentName, promptFile: string, responseFile: string): string {
   switch (agent) {
-    case "claude":
+    case 'claude':
       return `claude -p "$(cat '${promptFile}')" --output-format text 2>&1 | tee '${responseFile}'`;
-    case "gemini":
+    case 'gemini':
       // Gemini reads prompt from stdin — safest, no shell expansion
       return `cat '${promptFile}' | gemini 2>&1 | tee '${responseFile}'`;
-    case "codex":
+    case 'codex':
       return `codex exec "$(cat '${promptFile}')" 2>&1 | tee '${responseFile}'`;
   }
 }
@@ -51,7 +47,7 @@ export async function askViaPanePipe(
   const start = Date.now();
 
   const state = loadState(cwd);
-  if (!state) throw new Error("No active UltraAgent session found");
+  if (!state) throw new Error('No active UltraAgent session found');
 
   const pane = state.panes.find((p) => p.agent === agentName);
   if (!pane) throw new Error(`No pane found for agent "${agentName}"`);
@@ -63,7 +59,7 @@ export async function askViaPanePipe(
   const doneMarker = `UA_DONE_${id}`;
 
   // Write prompt to temp file (avoids all shell escaping issues)
-  await writeFile(promptFile, prompt, "utf-8");
+  await writeFile(promptFile, prompt, 'utf-8');
 
   // Build the full command: agent pipe + tee + done marker
   const agentCmd = buildAgentCommand(agentName, promptFile, responseFile);
@@ -75,7 +71,7 @@ export async function askViaPanePipe(
   await tmuxSendKeys(pane.paneId, fullCmd);
 
   // Poll for completion
-  let responseText = "";
+  let responseText = '';
 
   while (Date.now() - start < timeout) {
     const paneContent = await tmuxCapturePane(pane.paneId, {
@@ -86,7 +82,7 @@ export async function askViaPanePipe(
     if (paneContent.includes(doneMarker)) {
       // Read final response from file
       try {
-        const content = await readFile(responseFile, "utf-8");
+        const content = await readFile(responseFile, 'utf-8');
         if (content.trim()) responseText = content.trim();
       } catch {
         /* file might not exist if command failed */
@@ -95,24 +91,21 @@ export async function askViaPanePipe(
     }
 
     // Check for errors (rate limit, not found, etc.)
-    const lastLines = paneContent.split("\n").slice(-10).join("\n");
+    const lastLines = paneContent.split('\n').slice(-10).join('\n');
     for (const pattern of ERROR_PATTERNS) {
       if (pattern.test(lastLines)) {
-        const match = lastLines.split("\n").find((line) => pattern.test(line));
-        responseText = `Error: ${match?.trim() ?? "Agent error detected"}`;
+        const match = lastLines.split('\n').find((line) => pattern.test(line));
+        responseText = `Error: ${match?.trim() ?? 'Agent error detected'}`;
         break;
       }
     }
-    if (responseText.startsWith("Error:")) break;
+    if (responseText.startsWith('Error:')) break;
 
     // Read partial response (for logging)
     try {
-      const partial = await readFile(responseFile, "utf-8");
+      const partial = await readFile(responseFile, 'utf-8');
       if (partial.trim().length > 0) {
-        logger.debug(
-          `${agentName} partial: ${partial.trim().length} chars`,
-          CTX,
-        );
+        logger.debug(`${agentName} partial: ${partial.trim().length} chars`, CTX);
       }
     } catch {
       /* not ready yet */
@@ -134,18 +127,15 @@ export async function askViaPanePipe(
 
   if (!responseText) {
     logger.warn(`No response from ${agentName} after ${durationMs}ms`, CTX);
-    responseText = "[No response — agent may have timed out]";
+    responseText = '[No response — agent may have timed out]';
   } else {
-    logger.info(
-      `${agentName} responded (${responseText.length} chars, ${durationMs}ms)`,
-      CTX,
-    );
+    logger.info(`${agentName} responded (${responseText.length} chars, ${durationMs}ms)`, CTX);
   }
 
   return {
     agent: agentName,
     content: responseText,
-    exitCode: responseText.startsWith("Error:") ? 1 : 0,
+    exitCode: responseText.startsWith('Error:') ? 1 : 0,
     durationMs,
   };
 }

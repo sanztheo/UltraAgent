@@ -1,23 +1,15 @@
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { tmuxSendKeys } from "../tmux/commands.js";
-import { loadState } from "../orchestrator/state.js";
-import { sleep } from "../utils/process.js";
-import { execCommand } from "../utils/shell.js";
-import { logger } from "../utils/logger.js";
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { loadState } from '../orchestrator/state.js';
+import { tmuxSendKeys } from '../tmux/commands.js';
+import { logger } from '../utils/logger.js';
+import { sleep } from '../utils/process.js';
+import { execCommand } from '../utils/shell.js';
 
 const PROMPT_RE = /[$ > › % ❯ # ❮]\s*$/m;
 
 /** Capture full scrollback history of a pane (not just visible area) */
 async function captureFullPane(paneId: string): Promise<string> {
-  const result = await execCommand("tmux", [
-    "capture-pane",
-    "-t",
-    paneId,
-    "-p",
-    "-J",
-    "-S",
-    "-",
-  ]);
+  const result = await execCommand('tmux', ['capture-pane', '-t', paneId, '-p', '-J', '-S', '-']);
   return result.stdout;
 }
 
@@ -32,7 +24,7 @@ export async function askViaPane(
 
   const state = loadState(cwd);
   if (!state) {
-    throw new Error("No active UltraAgent session found");
+    throw new Error('No active UltraAgent session found');
   }
 
   const pane = state.panes.find((p) => p.agent === agentName);
@@ -40,14 +32,11 @@ export async function askViaPane(
     throw new Error(`No pane found for agent "${agentName}"`);
   }
 
-  logger.info(
-    `Sending prompt to ${agentName} in pane ${pane.paneId}`,
-    "pane-ipc",
-  );
+  logger.info(`Sending prompt to ${agentName} in pane ${pane.paneId}`, 'pane-ipc');
 
   // Capture full scrollback before sending
   const before = await captureFullPane(pane.paneId);
-  const beforeLineCount = before.trimEnd().split("\n").length;
+  const beforeLineCount = before.trimEnd().split('\n').length;
 
   // Send the prompt to the interactive pane
   await tmuxSendKeys(pane.paneId, prompt);
@@ -56,23 +45,20 @@ export async function askViaPane(
   await sleep(3_000);
 
   // Poll for response completion
-  let lastContent = "";
+  let lastContent = '';
   let stableChecks = 0;
   const STABLE_THRESHOLD = 6; // stable for 3s (6 * 500ms)
 
   while (Date.now() - start < timeout) {
     const content = await captureFullPane(pane.paneId);
-    const currentLineCount = content.trimEnd().split("\n").length;
+    const currentLineCount = content.trimEnd().split('\n').length;
     const hasNewContent = currentLineCount > beforeLineCount + 1;
 
     if (hasNewContent && content === lastContent) {
       stableChecks++;
       if (stableChecks >= STABLE_THRESHOLD) {
         // Content stabilized — likely done
-        logger.debug(
-          `${agentName} response complete (content stable)`,
-          "pane-ipc",
-        );
+        logger.debug(`${agentName} response complete (content stable)`, 'pane-ipc');
         break;
       }
     } else {
@@ -88,10 +74,7 @@ export async function askViaPane(
   const response = extractResponse(prompt, after);
   const durationMs = Date.now() - start;
 
-  logger.info(
-    `${agentName} responded in ${durationMs}ms (${response.length} chars)`,
-    "pane-ipc",
-  );
+  logger.info(`${agentName} responded in ${durationMs}ms (${response.length} chars)`, 'pane-ipc');
 
   return {
     agent: agentName,
@@ -102,7 +85,7 @@ export async function askViaPane(
 }
 
 function extractResponse(prompt: string, fullCapture: string): string {
-  const lines = fullCapture.split("\n");
+  const lines = fullCapture.split('\n');
 
   // Find the line that contains our prompt (search from the end for the most recent)
   const promptSnippet = prompt.slice(0, 60).trim();
@@ -116,10 +99,7 @@ function extractResponse(prompt: string, fullCapture: string): string {
 
   if (promptLineIndex === -1) {
     // Fallback: return last 20 lines minus prompt lines
-    logger.warn(
-      "Could not find prompt in pane capture, using tail fallback",
-      "pane-ipc",
-    );
+    logger.warn('Could not find prompt in pane capture, using tail fallback', 'pane-ipc');
     const tail = lines.slice(-20);
     return cleanResponseLines(tail);
   }
@@ -134,12 +114,8 @@ function cleanResponseLines(lines: string[]): string {
   const cleaned = [...lines];
 
   while (cleaned.length > 0) {
-    const last = cleaned[cleaned.length - 1]?.trim() ?? "";
-    if (
-      last === "" ||
-      PROMPT_RE.test(last) ||
-      /^[>›]\s*(Type your|$)/.test(last)
-    ) {
+    const last = cleaned[cleaned.length - 1]?.trim() ?? '';
+    if (last === '' || PROMPT_RE.test(last) || /^[>›]\s*(Type your|$)/.test(last)) {
       cleaned.pop();
     } else {
       break;
@@ -147,9 +123,9 @@ function cleanResponseLines(lines: string[]): string {
   }
 
   // Remove leading empty lines
-  while (cleaned.length > 0 && (cleaned[0]?.trim() ?? "") === "") {
+  while (cleaned.length > 0 && (cleaned[0]?.trim() ?? '') === '') {
     cleaned.shift();
   }
 
-  return cleaned.join("\n").trim();
+  return cleaned.join('\n').trim();
 }

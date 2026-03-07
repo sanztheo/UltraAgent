@@ -1,7 +1,7 @@
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { loadState } from "../orchestrator/state.js";
-import { logger } from "../utils/logger.js";
-import { askViaPanePipe } from "./pane-pipe-ipc.js";
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { loadState } from '../orchestrator/state.js';
+import { logger } from '../utils/logger.js';
+import { askViaPanePipe } from './pane-pipe-ipc.js';
 
 export class IpcCoordinator {
   constructor(
@@ -15,25 +15,22 @@ export class IpcCoordinator {
   private getWorkers(): AgentName[] {
     const state = loadState(process.cwd());
     if (state) return [...state.workers];
-    return ["codex", "gemini"];
+    return ['codex', 'gemini'];
   }
 
   async askAgent(agent: AgentName, prompt: string): Promise<AgentResponse> {
     this.validatePayload(prompt);
-    logger.info(`askAgent → ${agent}`, "ipc");
+    logger.info(`askAgent → ${agent}`, 'ipc');
 
     return askViaPanePipe(agent, prompt, {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
 
-  async broadcast(
-    prompt: string,
-    agents?: AgentName[],
-  ): Promise<AgentResponse[]> {
+  async broadcast(prompt: string, agents?: AgentName[]): Promise<AgentResponse[]> {
     this.validatePayload(prompt);
     const targets = agents ?? this.getWorkers();
-    logger.info(`broadcast → [${targets.join(", ")}]`, "ipc");
+    logger.info(`broadcast → [${targets.join(', ')}]`, 'ipc');
 
     const results = await Promise.allSettled(
       targets.map((agent) =>
@@ -44,13 +41,10 @@ export class IpcCoordinator {
     );
 
     return results.map((result, i) => {
-      if (result.status === "fulfilled") return result.value;
-      const agent = targets[i] ?? "claude";
-      const message =
-        result.reason instanceof Error
-          ? result.reason.message
-          : "Unknown error";
-      logger.warn(`Broadcast to ${agent} failed: ${message}`, "ipc");
+      if (result.status === 'fulfilled') return result.value;
+      const agent = targets[i] ?? 'claude';
+      const message = result.reason instanceof Error ? result.reason.message : 'Unknown error';
+      logger.warn(`Broadcast to ${agent} failed: ${message}`, 'ipc');
       return {
         agent,
         content: `Error: ${message}`,
@@ -66,38 +60,36 @@ export class IpcCoordinator {
     options?: { canCode?: boolean; files?: string[] },
   ): Promise<AgentResponse> {
     this.validatePayload(task);
-    logger.info(`assignTask → ${agent}`, "ipc");
+    logger.info(`assignTask → ${agent}`, 'ipc');
 
     const parts = [
-      "You have been assigned the following task by UltraAgent orchestrator.",
-      "Complete it thoroughly and report your results.",
-      "",
+      'You have been assigned the following task by UltraAgent orchestrator.',
+      'Complete it thoroughly and report your results.',
+      '',
       `Task: ${task}`,
     ];
 
     if (options?.canCode) {
-      parts.push("", "You are allowed to write and modify code.");
+      parts.push('', 'You are allowed to write and modify code.');
     }
 
     if (options?.files && options.files.length > 0) {
-      parts.push("", `Relevant files: ${options.files.join(", ")}`);
+      parts.push('', `Relevant files: ${options.files.join(', ')}`);
     }
 
-    return askViaPanePipe(agent, parts.join("\n"), {
+    return askViaPanePipe(agent, parts.join('\n'), {
       timeoutMs: this.config.defaultTimeoutMs,
     });
   }
 
   private validatePayload(data: string): void {
-    const size = Buffer.byteLength(data, "utf-8");
+    const size = Buffer.byteLength(data, 'utf-8');
     if (size > this.config.maxPayloadBytes) {
-      throw new Error(
-        `Payload too large: ${size} bytes exceeds limit of ${this.config.maxPayloadBytes} bytes`,
-      );
+      throw new Error(`Payload too large: ${size} bytes exceeds limit of ${this.config.maxPayloadBytes} bytes`);
     }
   }
 }
 
-export { askViaPanePipe } from "./pane-pipe-ipc.js";
-export { askViaPipe } from "./pipe.js";
-export { handleCliBridge } from "./cli-bridge.js";
+export { askViaPanePipe } from './pane-pipe-ipc.js';
+export { askViaPipe } from './pipe.js';
+export { handleCliBridge } from './cli-bridge.js';

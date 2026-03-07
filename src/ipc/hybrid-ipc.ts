@@ -1,8 +1,8 @@
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { tmuxSendKeys } from "../tmux/commands.js";
-import { loadState } from "../orchestrator/state.js";
-import { askViaPipe } from "./pipe.js";
-import { logger } from "../utils/logger.js";
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { loadState } from '../orchestrator/state.js';
+import { tmuxSendKeys } from '../tmux/commands.js';
+import { logger } from '../utils/logger.js';
+import { askViaPipe } from './pipe.js';
 
 /**
  * Hybrid IPC: sends the prompt to the visible tmux pane (so the user sees it)
@@ -26,17 +26,13 @@ export async function askHybrid(
 
   logger.info(
     `Hybrid IPC: ${agentName} responded (${response.content.length} chars, exit ${response.exitCode})`,
-    "ipc:hybrid",
+    'ipc:hybrid',
   );
 
   return response;
 }
 
-async function sendToPane(
-  agentName: AgentName,
-  prompt: string,
-  cwd: string,
-): Promise<void> {
+async function sendToPane(agentName: AgentName, prompt: string, cwd: string): Promise<void> {
   try {
     const state = loadState(cwd);
     if (!state) {
@@ -49,15 +45,9 @@ async function sendToPane(
     }
 
     await tmuxSendKeys(pane.paneId, prompt);
-    logger.debug(
-      `Prompt sent to ${agentName} pane for visual feedback`,
-      "ipc:hybrid",
-    );
+    logger.debug(`Prompt sent to ${agentName} pane for visual feedback`, 'ipc:hybrid');
   } catch {
     // Visual feedback is best-effort — don't fail the IPC call
-    logger.debug(
-      `Could not send to ${agentName} pane (best-effort)`,
-      "ipc:hybrid",
-    );
+    logger.debug(`Could not send to ${agentName} pane (best-effort)`, 'ipc:hybrid');
   }
 }
