@@ -1,10 +1,25 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
-import { tmuxSendKeys, tmuxCapturePane } from "../tmux/commands.js";
+import { tmuxSendKeys } from "../tmux/commands.js";
 import { loadState } from "../orchestrator/state.js";
 import { sleep } from "../utils/process.js";
+import { execCommand } from "../utils/shell.js";
 import { logger } from "../utils/logger.js";
 
-const PROMPT_RE = /[$ > › % ❯ # ❮ ›]\s*$/m;
+const PROMPT_RE = /[$ > › % ❯ # ❮]\s*$/m;
+
+/** Capture full scrollback history of a pane (not just visible area) */
+async function captureFullPane(paneId: string): Promise<string> {
+  const result = await execCommand("tmux", [
+    "capture-pane",
+    "-t",
+    paneId,
+    "-p",
+    "-J",
+    "-S",
+    "-",
+  ]);
+  return result.stdout;
+}
 
 export async function askViaPane(
   agentName: AgentName,
@@ -30,52 +45,47 @@ export async function askViaPane(
     "pane-ipc",
   );
 
-  // Capture baseline content
-  const baseline = await tmuxCapturePane(pane.paneId);
-  const baselineLength = baseline.trimEnd().length;
+  // Capture full scrollback before sending
+  const before = await captureFullPane(pane.paneId);
+  const beforeLineCount = before.trimEnd().split("\n").length;
 
   // Send the prompt to the interactive pane
   await tmuxSendKeys(pane.paneId, prompt);
 
   // Wait for CLI to start processing
-  await sleep(2_000);
+  await sleep(3_000);
 
   // Poll for response completion
   let lastContent = "";
   let stableChecks = 0;
-  const STABLE_THRESHOLD = 4; // stable for 2s (4 * 500ms)
+  const STABLE_THRESHOLD = 6; // stable for 3s (6 * 500ms)
 
   while (Date.now() - start < timeout) {
-    const content = await tmuxCapturePane(pane.paneId);
-    const trimmed = content.trimEnd();
+    const content = await captureFullPane(pane.paneId);
+    const currentLineCount = content.trimEnd().split("\n").length;
+    const hasNewContent = currentLineCount > beforeLineCount + 1;
 
-    const hasNewContent = trimmed.length > baselineLength + 10;
-
-    if (hasNewContent && trimmed === lastContent) {
+    if (hasNewContent && content === lastContent) {
       stableChecks++;
-
       if (stableChecks >= STABLE_THRESHOLD) {
-        // Content stabilized — check for prompt return
-        const lastLines = trimmed.split("\n").slice(-3).join("\n");
-        if (PROMPT_RE.test(lastLines)) {
-          logger.debug(
-            `${agentName} response complete (prompt returned)`,
-            "pane-ipc",
-          );
-          break;
-        }
+        // Content stabilized — likely done
+        logger.debug(
+          `${agentName} response complete (content stable)`,
+          "pane-ipc",
+        );
+        break;
       }
     } else {
       stableChecks = 0;
     }
 
-    lastContent = trimmed;
+    lastContent = content;
     await sleep(500);
   }
 
-  // Capture final content and extract response
-  const finalContent = await tmuxCapturePane(pane.paneId);
-  const response = extractResponse(baseline, finalContent);
+  // Capture final full scrollback and extract response
+  const after = await captureFullPane(pane.paneId);
+  const response = extractResponse(prompt, after);
   const durationMs = Date.now() - start;
 
   logger.info(
@@ -91,27 +101,55 @@ export async function askViaPane(
   };
 }
 
-function extractResponse(baseline: string, final: string): string {
-  const baselineLines = baseline.trimEnd().split("\n");
-  const finalLines = final.trimEnd().split("\n");
+function extractResponse(prompt: string, fullCapture: string): string {
+  const lines = fullCapture.split("\n");
 
-  // New lines = everything after baseline
-  const newLines = finalLines.slice(baselineLines.length);
+  // Find the line that contains our prompt (search from the end for the most recent)
+  const promptSnippet = prompt.slice(0, 60).trim();
+  let promptLineIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i]?.includes(promptSnippet)) {
+      promptLineIndex = i;
+      break;
+    }
+  }
 
-  // Remove prompt-only lines at the end
-  while (newLines.length > 0) {
-    const last = newLines[newLines.length - 1]?.trim() ?? "";
-    if (last === "" || /^[$ > › % ❯ # ❮]$/.test(last)) {
-      newLines.pop();
+  if (promptLineIndex === -1) {
+    // Fallback: return last 20 lines minus prompt lines
+    logger.warn(
+      "Could not find prompt in pane capture, using tail fallback",
+      "pane-ipc",
+    );
+    const tail = lines.slice(-20);
+    return cleanResponseLines(tail);
+  }
+
+  // Everything after the prompt line is the response
+  const responseLines = lines.slice(promptLineIndex + 1);
+  return cleanResponseLines(responseLines);
+}
+
+function cleanResponseLines(lines: string[]): string {
+  // Remove empty trailing lines and prompt-only lines
+  const cleaned = [...lines];
+
+  while (cleaned.length > 0) {
+    const last = cleaned[cleaned.length - 1]?.trim() ?? "";
+    if (
+      last === "" ||
+      PROMPT_RE.test(last) ||
+      /^[>›]\s*(Type your|$)/.test(last)
+    ) {
+      cleaned.pop();
     } else {
       break;
     }
   }
 
-  // Remove the first line (the prompt we sent)
-  if (newLines.length > 0) {
-    newLines.shift();
+  // Remove leading empty lines
+  while (cleaned.length > 0 && (cleaned[0]?.trim() ?? "") === "") {
+    cleaned.shift();
   }
 
-  return newLines.join("\n").trim();
+  return cleaned.join("\n").trim();
 }
