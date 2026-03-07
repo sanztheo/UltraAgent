@@ -5,28 +5,6 @@ import { tmuxCapturePane, tmuxSendKeys } from "../tmux/commands.js";
 import { loadState } from "../orchestrator/state.js";
 import { logger } from "../utils/logger.js";
 
-function formatResponse(response: AgentResponse): {
-  content: Array<{ type: "text"; text: string }>;
-} {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(
-          {
-            agent: response.agent,
-            content: response.content,
-            exitCode: response.exitCode,
-            durationMs: response.durationMs,
-          },
-          null,
-          2,
-        ),
-      },
-    ],
-  };
-}
-
 function formatMultiResponse(responses: AgentResponse[]): {
   content: Array<{ type: "text"; text: string }>;
 } {
@@ -64,8 +42,34 @@ export function createAskAgentHandler(coordinator: IpcCoordinator) {
     prompt: string;
   }): Promise<{ content: Array<{ type: "text"; text: string }> }> => {
     try {
-      const response = await coordinator.askAgent(args.agent, args.prompt);
-      return formatResponse(response);
+      // Also async with notification — chef never blocks
+      const entry = createTask(args.agent, args.prompt);
+
+      coordinator
+        .askAgent(args.agent, args.prompt)
+        .then(async (result) => {
+          completeTask(entry.id, result);
+          await notifyChef(entry.id, args.agent, result);
+        })
+        .catch(async (error) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const errorResult: AgentResponse = {
+            agent: args.agent,
+            content: `Error: ${message}`,
+            exitCode: 1,
+            durationMs: Date.now() - entry.startedAt,
+          };
+          completeTask(entry.id, errorResult);
+          await notifyChef(entry.id, args.agent, errorResult);
+        });
+
+      return jsonResponse({
+        taskId: entry.id,
+        agent: args.agent,
+        status: "running",
+        message: `Question sent to ${args.agent}. You will be notified automatically when the response arrives.`,
+      });
     } catch (error) {
       return errorResponse(error);
     }

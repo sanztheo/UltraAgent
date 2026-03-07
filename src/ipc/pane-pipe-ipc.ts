@@ -78,7 +78,9 @@ export async function askViaPanePipe(
   let responseText = "";
 
   while (Date.now() - start < timeout) {
-    const paneContent = await tmuxCapturePane(pane.paneId);
+    const paneContent = await tmuxCapturePane(pane.paneId, {
+      fullScrollback: true,
+    });
 
     // Check for done marker → command finished
     if (paneContent.includes(doneMarker)) {
