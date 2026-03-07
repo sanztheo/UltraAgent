@@ -1,4 +1,4 @@
-import type { AgentName } from "../config/types.js";
+import type { AgentName } from '../config/types.js';
 
 export function generateChefInstructions(options: {
   agentName: AgentName;
@@ -7,7 +7,7 @@ export function generateChefInstructions(options: {
   projectName: string;
 }): string {
   const { agentName, workers, mcpAvailable, projectName } = options;
-  const workerList = workers.map((w) => `- **${w}**`).join("\n");
+  const workerList = workers.map((w) => `- **${w}**`).join('\n');
 
   const mcpSection = mcpAvailable
     ? `## Communication (MCP Tools)

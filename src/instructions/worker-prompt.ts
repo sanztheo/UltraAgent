@@ -1,8 +1,8 @@
-import type { AgentName } from "../config/types.js";
+import type { AgentName } from '../config/types.js';
 
 export function generateWorkerInstructions(options: {
   agentName: AgentName;
-  role: "worker";
+  role: 'worker';
   chefName: AgentName;
   projectName: string;
 }): string {
