@@ -15,6 +15,9 @@ export async function tmuxNewSession(
   name: string,
   options?: { cwd?: string; detached?: boolean },
 ): Promise<void> {
+  // Set large scrollback so pane capture works for long tasks
+  await execCommand("tmux", ["set-option", "-g", "history-limit", "50000"]);
+
   const args = ["new-session", "-s", name];
   if (options?.detached !== false) {
     args.push("-d");
