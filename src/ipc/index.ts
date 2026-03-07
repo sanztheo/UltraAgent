@@ -1,8 +1,7 @@
 import type { AgentName, AgentResponse } from "../config/types.js";
+import { loadState } from "../orchestrator/state.js";
 import { logger } from "../utils/logger.js";
 import { askViaConversation } from "./conversation-ipc.js";
-
-const ALL_AGENTS: readonly AgentName[] = ["claude", "codex", "gemini"];
 
 export class IpcCoordinator {
   constructor(
@@ -11,6 +10,14 @@ export class IpcCoordinator {
       maxPayloadBytes: number;
     },
   ) {}
+
+  /** Get worker agents from session state (excludes the chef) */
+  private getWorkers(): AgentName[] {
+    const state = loadState(process.cwd());
+    if (state) return [...state.workers];
+    // Fallback if no state found
+    return ["codex", "gemini"];
+  }
 
   async askAgent(agent: AgentName, prompt: string): Promise<AgentResponse> {
     this.validatePayload(prompt);
@@ -26,7 +33,7 @@ export class IpcCoordinator {
     agents?: AgentName[],
   ): Promise<AgentResponse[]> {
     this.validatePayload(prompt);
-    const targets = agents ?? [...ALL_AGENTS];
+    const targets = agents ?? this.getWorkers();
     logger.info(`broadcast → [${targets.join(", ")}]`, "ipc");
 
     const results = await Promise.allSettled(

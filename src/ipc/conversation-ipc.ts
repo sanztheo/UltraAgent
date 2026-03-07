@@ -2,13 +2,41 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { AgentName, AgentResponse } from "../config/types.js";
-import { tmuxSendKeys } from "../tmux/commands.js";
+import { tmuxSendKeys, tmuxCapturePane } from "../tmux/commands.js";
 import { loadState } from "../orchestrator/state.js";
 import { sleep } from "../utils/process.js";
 import { logger } from "../utils/logger.js";
 import { execCommand } from "../utils/shell.js";
 
 const CTX = "ipc:conv";
+
+// ─── Rate limit / error detection ───────────────────────────────────
+
+const ERROR_PATTERNS = [
+  /you've hit your usage limit/i,
+  /usage limit exceeded/i,
+  /rate limit/i,
+  /quota exceeded/i,
+  /too many requests/i,
+  /error 429/i,
+  /overloaded_error/i,
+  /credit balance is too low/i,
+  /billing/i,
+];
+
+async function checkPaneForErrors(paneId: string): Promise<string | undefined> {
+  const content = await tmuxCapturePane(paneId);
+  // Check last 15 lines for error patterns
+  const lastLines = content.split("\n").slice(-15).join("\n");
+  for (const pattern of ERROR_PATTERNS) {
+    if (pattern.test(lastLines)) {
+      // Extract the matching line for context
+      const match = lastLines.split("\n").find((line) => pattern.test(line));
+      return match?.trim() ?? "Rate limit or error detected";
+    }
+  }
+  return undefined;
+}
 
 // ─── Conversation file locators ─────────────────────────────────────
 
@@ -285,9 +313,27 @@ export async function askViaConversation(
   // 4. Poll conversation file for new assistant content
   let responseText = "";
   let stableChecks = 0;
+  let pollCount = 0;
   const STABLE_THRESHOLD = 4; // 2s stable (4 × 500ms)
+  const ERROR_CHECK_INTERVAL = 6; // Check pane for errors every ~3s
 
   while (Date.now() - start < timeout) {
+    pollCount++;
+
+    // Periodically check tmux pane for rate limits / errors
+    if (pollCount % ERROR_CHECK_INTERVAL === 0) {
+      const paneError = await checkPaneForErrors(pane.paneId);
+      if (paneError) {
+        logger.warn(`${agentName} error detected: ${paneError}`, CTX);
+        return {
+          agent: agentName,
+          content: `Error: ${paneError}`,
+          exitCode: 1,
+          durationMs: Date.now() - start,
+        };
+      }
+    }
+
     // Re-find file if it wasn't found initially (created after prompt)
     const currentFile = convFile ?? (await findActiveFile(agentName, cwd));
 
