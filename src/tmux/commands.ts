@@ -67,16 +67,35 @@ export async function tmuxSendKeys(
   paneTarget: string,
   keys: string,
 ): Promise<void> {
-  const result = await execCommand("tmux", [
+  // Send text literally (-l flag prevents tmux from interpreting special keys)
+  const textResult = await execCommand("tmux", [
     "send-keys",
     "-t",
     paneTarget,
+    "-l",
     keys,
+  ]);
+  if (textResult.exitCode !== 0) {
+    logger.error(
+      `Failed to send keys to ${paneTarget}: ${textResult.stderr}`,
+      CTX,
+    );
+    throw new Error(`tmux send-keys failed: ${textResult.stderr}`);
+  }
+
+  // Then press Enter separately
+  const enterResult = await execCommand("tmux", [
+    "send-keys",
+    "-t",
+    paneTarget,
     "Enter",
   ]);
-  if (result.exitCode !== 0) {
-    logger.error(`Failed to send keys to ${paneTarget}: ${result.stderr}`, CTX);
-    throw new Error(`tmux send-keys failed: ${result.stderr}`);
+  if (enterResult.exitCode !== 0) {
+    logger.error(
+      `Failed to send Enter to ${paneTarget}: ${enterResult.stderr}`,
+      CTX,
+    );
+    throw new Error(`tmux send-keys Enter failed: ${enterResult.stderr}`);
   }
 }
 
