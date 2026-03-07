@@ -30,15 +30,7 @@ function findChefPane() {
 }
 
 function buildReportInstruction(taskId: string): string {
-  return [
-    "",
-    "",
-    "IMPORTANT: When you finish, you MUST call the `ultra_report_complete` MCP tool with:",
-    `  task_id: "${taskId}"`,
-    "  result: your complete response",
-    "  exit_code: 0 (success) or 1 (error)",
-    "The chef is waiting for your report. Do NOT skip this step.",
-  ].join("\n");
+  return `\n\n[Task ${taskId}] When done, call ultra_report_complete(task_id="${taskId}", result="<your answer>"). Do NOT repeat the answer in chat — only send it via the tool.`;
 }
 
 async function sendToWorkerPane(
