@@ -1,62 +1,44 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from 'node:fs/promises';
 import type {
   AgentName,
-  AgentRole,
   AgentResponse,
+  AgentRole,
   AskOptions,
   LaunchOptions,
   PermissionMode,
   ShellCommand,
-} from "../config/types.js";
-import { execCommand, which } from "../utils/shell.js";
-import { logger } from "../utils/logger.js";
-import type { CliAdapter } from "./types.js";
+} from '../config/types.js';
+import { logger } from '../utils/logger.js';
+import { execCommand, which } from '../utils/shell.js';
+import type { CliAdapter } from './types.js';
 
-const MARKER_START = "<!-- ULTRAAGENT:START -->";
-const MARKER_END = "<!-- ULTRAAGENT:END -->";
+const MARKER_START = '<!-- ULTRAAGENT:START -->';
+const MARKER_END = '<!-- ULTRAAGENT:END -->';
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export abstract class BaseAdapter implements CliAdapter {
   abstract readonly name: AgentName;
   protected abstract readonly binary: string;
 
-  abstract getInteractiveLaunchCommand(
-    options: LaunchOptions,
-  ): ShellCommand | Promise<ShellCommand>;
-  abstract getInstructionFilePath(
-    scope: "global" | "project",
-    cwd: string,
-  ): string;
-  abstract registerMcpServer(
-    name: string,
-    command: string,
-    args: string[],
-  ): Promise<void>;
+  abstract getInteractiveLaunchCommand(options: LaunchOptions): ShellCommand | Promise<ShellCommand>;
+  abstract getInstructionFilePath(scope: 'global' | 'project', cwd: string): string;
+  abstract registerMcpServer(name: string, command: string, args: string[]): Promise<void>;
   abstract getPermissionFlags(mode: PermissionMode): string[];
 
-  protected abstract buildNonInteractiveArgs(
-    prompt: string,
-    options?: AskOptions,
-  ): string[];
+  protected abstract buildNonInteractiveArgs(prompt: string, options?: AskOptions): string[];
 
   async isAvailable(): Promise<boolean> {
     const path = await which(this.binary);
     const available = path !== undefined;
-    logger.debug(
-      `${this.binary} ${available ? "found" : "not found"} at ${path ?? "N/A"}`,
-      this.name,
-    );
+    logger.debug(`${this.binary} ${available ? 'found' : 'not found'} at ${path ?? 'N/A'}`, this.name);
     return available;
   }
 
-  async askNonInteractive(
-    prompt: string,
-    options?: AskOptions,
-  ): Promise<AgentResponse> {
+  async askNonInteractive(prompt: string, options?: AskOptions): Promise<AgentResponse> {
     const args = this.buildNonInteractiveArgs(prompt, options);
     const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    logger.debug(`Executing: ${this.binary} ${args.join(" ")}`, this.name);
+    logger.debug(`Executing: ${this.binary} ${args.join(' ')}`, this.name);
     const start = performance.now();
 
     const result = await execCommand(this.binary, args, {
@@ -67,10 +49,7 @@ export abstract class BaseAdapter implements CliAdapter {
     const durationMs = Math.round(performance.now() - start);
 
     if (result.exitCode !== 0) {
-      logger.warn(
-        `Non-interactive call exited with code ${result.exitCode}: ${result.stderr}`,
-        this.name,
-      );
+      logger.warn(`Non-interactive call exited with code ${result.exitCode}: ${result.stderr}`, this.name);
     }
 
     return {
@@ -81,17 +60,13 @@ export abstract class BaseAdapter implements CliAdapter {
     };
   }
 
-  async injectInstructions(
-    role: AgentRole,
-    content: string,
-    cwd: string,
-  ): Promise<void> {
-    const filePath = this.getInstructionFilePath("project", cwd);
+  async injectInstructions(role: AgentRole, content: string, cwd: string): Promise<void> {
+    const filePath = this.getInstructionFilePath('project', cwd);
     const block = `${MARKER_START}\n# UltraAgent (${role})\n${content}\n${MARKER_END}`;
 
-    let existing = "";
+    let existing = '';
     try {
-      existing = await readFile(filePath, "utf-8");
+      existing = await readFile(filePath, 'utf-8');
     } catch {
       // File doesn't exist yet — will be created
     }
@@ -101,15 +76,12 @@ export abstract class BaseAdapter implements CliAdapter {
 
     let updated: string;
     if (startIdx !== -1 && endIdx !== -1) {
-      updated =
-        existing.slice(0, startIdx) +
-        block +
-        existing.slice(endIdx + MARKER_END.length);
+      updated = existing.slice(0, startIdx) + block + existing.slice(endIdx + MARKER_END.length);
     } else {
       updated = existing ? `${existing}\n\n${block}\n` : `${block}\n`;
     }
 
-    await writeFile(filePath, updated, "utf-8");
+    await writeFile(filePath, updated, 'utf-8');
     logger.debug(`Injected ${role} instructions into ${filePath}`, this.name);
   }
 }
