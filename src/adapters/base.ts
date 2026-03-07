@@ -20,7 +20,9 @@ export abstract class BaseAdapter implements CliAdapter {
   abstract readonly name: AgentName;
   protected abstract readonly binary: string;
 
-  abstract getInteractiveLaunchCommand(options: LaunchOptions): ShellCommand;
+  abstract getInteractiveLaunchCommand(
+    options: LaunchOptions,
+  ): ShellCommand | Promise<ShellCommand>;
   abstract getInstructionFilePath(
     scope: "global" | "project",
     cwd: string,

@@ -13,13 +13,35 @@ import { BaseAdapter } from "./base.js";
 export class ClaudeAdapter extends BaseAdapter {
   readonly name = "claude" as const;
   protected readonly binary = "claude";
+  private ccAvailable: boolean | undefined;
 
-  getInteractiveLaunchCommand(options: LaunchOptions): ShellCommand {
+  /** Check if `cc` alias/binary is available (cached) */
+  private async hasCc(): Promise<boolean> {
+    if (this.ccAvailable === undefined) {
+      // cc is typically a shell alias — check via shell
+      const result = await execCommand("sh", ["-ic", "command -v cc"]);
+      this.ccAvailable =
+        result.exitCode === 0 && result.stdout.includes("claude");
+    }
+    return this.ccAvailable;
+  }
+
+  async getInteractiveLaunchCommand(
+    options: LaunchOptions,
+  ): Promise<ShellCommand> {
+    // Use `cc` if available — it's an alias for `claude --dangerously-skip-permissions`
+    const useCc = await this.hasCc();
+
+    if (useCc) {
+      // cc already includes --dangerously-skip-permissions
+      // Only add extra args (no permission flags needed)
+      return { command: "cc", args: [...(options.extraArgs ?? [])] };
+    }
+
     const args = [
       ...this.getPermissionFlags(options.permissionMode),
       ...(options.extraArgs ?? []),
     ];
-
     return { command: this.binary, args };
   }
 

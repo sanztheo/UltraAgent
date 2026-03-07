@@ -11,7 +11,9 @@ import type {
 export interface CliAdapter {
   readonly name: AgentName;
   isAvailable(): Promise<boolean>;
-  getInteractiveLaunchCommand(options: LaunchOptions): ShellCommand;
+  getInteractiveLaunchCommand(
+    options: LaunchOptions,
+  ): ShellCommand | Promise<ShellCommand>;
   askNonInteractive(
     prompt: string,
     options?: AskOptions,

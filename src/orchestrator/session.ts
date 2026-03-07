@@ -83,7 +83,7 @@ export async function startSession(
   }
 
   // Step 4: Launch chef in the first pane (pane 0)
-  const chefLaunchCmd = chefAdapter.getInteractiveLaunchCommand({
+  const chefLaunchCmd = await chefAdapter.getInteractiveLaunchCommand({
     role: "chef",
     cwd: resolvedCwd,
     permissionMode: config.permissions.chef_mode,
@@ -123,7 +123,7 @@ export async function startSession(
       resolvedCwd,
     );
 
-    const workerLaunchCmd = workerAdapter.getInteractiveLaunchCommand({
+    const workerLaunchCmd = await workerAdapter.getInteractiveLaunchCommand({
       role: "worker",
       cwd: resolvedCwd,
       permissionMode: config.permissions.worker_mode,
