@@ -137,6 +137,13 @@ export function createGetTaskResultHandler() {
       return jsonResponse({ error: `Task "${args.task_id}" not found` });
     }
 
+    // Block until task completes (poll internally, no spam from the chef)
+    const maxWaitMs = 180_000; // 3 min max
+    const start = Date.now();
+    while (entry.status === "running" && Date.now() - start < maxWaitMs) {
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+
     const elapsed = (entry.completedAt ?? Date.now()) - entry.startedAt;
 
     if (entry.status === "running") {
@@ -145,7 +152,8 @@ export function createGetTaskResultHandler() {
         agent: entry.agent,
         status: "running",
         elapsedMs: elapsed,
-        message: "Task is still running. Check again in a few seconds.",
+        message:
+          "Task is still running after 3 min wait. Call again to keep waiting.",
       });
     }
 

@@ -53,7 +53,7 @@ export const TOOL_DEFINITIONS = {
   },
   ultra_get_task_result: {
     description:
-      "Get the result of a background task by its ID. Returns status (running/done/error) and the result content when complete.",
+      "Wait for a background task to finish and return its result. This call blocks until the task is done — call it once, not in a loop.",
     inputSchema: getTaskResultInputSchema,
   },
   ultra_list_tasks: {
