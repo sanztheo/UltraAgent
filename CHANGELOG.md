@@ -5,22 +5,27 @@ All notable changes to UltraAgent are documented here.
 ## [Unreleased]
 
 ### Added
-- **Pane-pipe IPC strategy** — workers execute non-interactive CLI commands directly in their tmux pane (`gemini -p ... | tee response.txt`). Output streams visibly, response captured via temp file. Replaces fragile conversation-file polling.
-- **Async task system** — `ultra_assign_task` and `ultra_ask_agent` both return immediately with a `taskId`. Tasks run in background; chef is auto-notified via tmux when done. New MCP tools:
-  - `ultra_get_task_result(taskId)` — check status and get result when done
+- **Worker self-report via `ultra_report_complete`** — workers now call an MCP tool to report task completion instead of relying on tmux polling or done markers. Inspired by OMX's lifecycle API approach.
+- **File-based task store** (`.ultraagent/tasks/*.json`) — shared state between chef and worker MCP server processes. Replaces in-memory `Map` which couldn't cross process boundaries.
+- **MCP registered with workers** — each worker gets the UltraAgent MCP server, giving them access to `ultra_report_complete`.
+- **Workers launched interactively** — workers now run their full interactive CLI (Claude Code, Gemini, Codex) in their tmux pane, with MCP tools available.
+- **Async task system** — `ultra_assign_task` and `ultra_ask_agent` both return immediately with a `taskId`. Workers call `ultra_report_complete` when done, chef gets auto-notified.
+  - `ultra_report_complete(task_id, result, exit_code)` — worker reports completion
+  - `ultra_get_task_result(taskId)` — check status and get result
   - `ultra_list_tasks()` — list all tasks with status and elapsed time
-  - `ultra_watch_agents()` — live snapshot of each worker's tmux pane (last 15 lines)
-- **Auto-notification** — `notifyChef()` sends task results directly to the chef's tmux pane when a background task completes. No polling needed.
-- **In-memory task store** (`src/mcp/task-store.ts`) — manages task lifecycle (running → done/error)
+  - `ultra_watch_agents()` — live snapshot of each worker's tmux pane
+- **Auto-notification** — `notifyChef()` sends task results directly to the chef's tmux pane.
 
 ### Changed
-- Worker panes no longer launch interactive CLIs. They stay at shell prompt and execute pipe commands on demand.
-- IPC coordinator now uses `askViaPanePipe` instead of `askViaConversation`.
-- `tmuxSendKeys` rewritten to use `tmux load-buffer` + `paste-buffer` for reliable text delivery (handles long prompts, special chars).
+- Workers run interactive CLIs instead of staying at shell prompt (reverted from pipe mode).
+- MCP handlers no longer depend on `IpcCoordinator` — they use `tmuxSendKeys` + file-based task store directly.
+- Worker prompts and templates updated with mandatory `ultra_report_complete` protocol.
+- Chef prompt updated to describe async workflow (no polling, auto-notification).
+- `tmuxSendKeys` rewritten to use `tmux load-buffer` + `paste-buffer` for reliable text delivery.
 - `tmuxCapturePane` supports full scrollback capture via `fullScrollback` option.
 
 ### Fixed
-- MCP handlers now wrap all calls in try/catch — errors return proper responses instead of crashing the stdio server (which caused Claude to freeze indefinitely).
+- MCP handlers now wrap all calls in try/catch — errors return proper responses instead of crashing the stdio server.
 - Prompts with newlines no longer cause premature Enter keypresses in tmux.
 
 ---
