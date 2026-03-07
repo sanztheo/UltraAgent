@@ -1,0 +1,37 @@
+{
+  "name": "ultraagent",
+  "version": "0.1.0",
+  "description": "Open-source orchestrator that makes AI CLI tools (Claude Code, Codex, Gemini) collaborate via tmux and MCP",
+  "type": "module",
+  "bin": {
+    "ultraagent": "./dist/bin/ultraagent.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/bin/ultraagent.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/"
+  },
+  "keywords": ["ai", "cli", "orchestrator", "claude", "codex", "gemini", "mcp", "tmux"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.8"
+  }
+}
