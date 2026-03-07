@@ -83,6 +83,9 @@ export async function tmuxSendKeys(
     throw new Error(`tmux send-keys failed: ${textResult.stderr}`);
   }
 
+  // Small delay so TUI apps (Codex/Ink, Gemini) can process the text
+  await new Promise((r) => setTimeout(r, 200));
+
   // Then press Enter separately
   const enterResult = await execCommand("tmux", [
     "send-keys",

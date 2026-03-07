@@ -1,11 +1,12 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { AgentName, AgentResponse } from "../config/types.js";
 import { tmuxSendKeys } from "../tmux/commands.js";
 import { loadState } from "../orchestrator/state.js";
 import { sleep } from "../utils/process.js";
 import { logger } from "../utils/logger.js";
+import { execCommand } from "../utils/shell.js";
 
 const CTX = "ipc:conv";
 
@@ -15,40 +16,41 @@ function encodeCwdForClaude(cwd: string): string {
   return cwd.replace(/\//g, "-");
 }
 
-function getSearchRoots(agent: AgentName, cwd: string): string[] {
-  const home = homedir();
-  switch (agent) {
-    case "claude":
-      return [join(home, ".claude", "projects", encodeCwdForClaude(cwd))];
-    case "gemini":
-      return [join(home, ".gemini", "tmp")];
-    case "codex": {
-      const now = new Date();
-      const y = now.getFullYear().toString();
-      const m = (now.getMonth() + 1).toString().padStart(2, "0");
-      const d = now.getDate().toString().padStart(2, "0");
-      return [
-        join(home, ".codex", "sessions", y, m, d),
-        join(home, ".codex", "sessions"),
-      ];
-    }
+/** Read ~/.gemini/projects.json to resolve project name for a cwd */
+async function resolveGeminiProjectName(cwd: string): Promise<string> {
+  const projectsFile = join(homedir(), ".gemini", "projects.json");
+  try {
+    const raw = await readFile(projectsFile, "utf-8");
+    const data = JSON.parse(raw) as { projects?: Record<string, string> };
+    if (data.projects?.[cwd]) return data.projects[cwd];
+  } catch {
+    /* file may not exist */
   }
+  // Fallback: lowercase basename
+  return basename(cwd).toLowerCase().replace(/\s+/g, "-");
 }
 
-function matchesAgent(agent: AgentName, fileName: string): boolean {
-  switch (agent) {
-    case "claude":
-      return fileName.endsWith(".jsonl") && !fileName.startsWith("summary-");
-    case "gemini":
-      return fileName.endsWith(".json");
-    case "codex":
-      return fileName.endsWith(".jsonl");
+/** Query Codex SQLite for the most recent rollout_path matching cwd */
+async function resolveCodexRolloutPath(
+  cwd: string,
+): Promise<string | undefined> {
+  const dbPath = join(homedir(), ".codex", "state_5.sqlite");
+  try {
+    const result = await execCommand("sqlite3", [
+      dbPath,
+      `SELECT rollout_path FROM threads WHERE cwd='${cwd}' ORDER BY created_at DESC LIMIT 1;`,
+    ]);
+    const path = result.stdout.trim();
+    if (path) return path;
+  } catch {
+    /* sqlite3 not available or db missing */
   }
+  return undefined;
 }
 
 async function findMostRecentFile(
   dir: string,
-  agent: AgentName,
+  extensions: string[],
   maxDepth: number,
 ): Promise<string | undefined> {
   try {
@@ -58,13 +60,21 @@ async function findMostRecentFile(
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
 
-      if (entry.isFile() && matchesAgent(agent, entry.name)) {
-        const s = await stat(fullPath);
-        if (!newest || s.mtimeMs > newest.mtime) {
-          newest = { path: fullPath, mtime: s.mtimeMs };
+      if (entry.isFile()) {
+        const matchesExt = extensions.some((ext) => entry.name.endsWith(ext));
+        const isSummary = entry.name.startsWith("summary-");
+        if (matchesExt && !isSummary) {
+          const s = await stat(fullPath);
+          if (!newest || s.mtimeMs > newest.mtime) {
+            newest = { path: fullPath, mtime: s.mtimeMs };
+          }
         }
       } else if (entry.isDirectory() && maxDepth > 0) {
-        const sub = await findMostRecentFile(fullPath, agent, maxDepth - 1);
+        const sub = await findMostRecentFile(
+          fullPath,
+          extensions,
+          maxDepth - 1,
+        );
         if (sub) {
           const s = await stat(sub);
           if (!newest || s.mtimeMs > newest.mtime) {
@@ -84,14 +94,38 @@ async function findActiveFile(
   agent: AgentName,
   cwd: string,
 ): Promise<string | undefined> {
-  const roots = getSearchRoots(agent, cwd);
-  const depth = agent === "gemini" ? 4 : 1;
+  const home = homedir();
 
-  for (const root of roots) {
-    const file = await findMostRecentFile(root, agent, depth);
-    if (file) return file;
+  switch (agent) {
+    case "claude": {
+      const dir = join(home, ".claude", "projects", encodeCwdForClaude(cwd));
+      return findMostRecentFile(dir, [".jsonl"], 1);
+    }
+    case "gemini": {
+      const projectName = await resolveGeminiProjectName(cwd);
+      const chatsDir = join(home, ".gemini", "tmp", projectName, "chats");
+      return findMostRecentFile(chatsDir, [".json"], 1);
+    }
+    case "codex": {
+      // Try SQLite first (most reliable)
+      const fromDb = await resolveCodexRolloutPath(cwd);
+      if (fromDb) {
+        try {
+          await stat(fromDb);
+          return fromDb;
+        } catch {
+          /* file gone */
+        }
+      }
+      // Fallback: most recent rollout in today's dir
+      const now = new Date();
+      const y = now.getFullYear().toString();
+      const m = (now.getMonth() + 1).toString().padStart(2, "0");
+      const d = now.getDate().toString().padStart(2, "0");
+      const dir = join(home, ".codex", "sessions", y, m, d);
+      return findMostRecentFile(dir, [".jsonl"], 1);
+    }
   }
-  return undefined;
 }
 
 // ─── Parsers: extract only assistant text ────────────────────────────
@@ -125,25 +159,28 @@ function parseClaudeNewLines(lines: string[]): string[] {
   return texts;
 }
 
-function parseGeminiNewModels(content: string, skipCount: number): string[] {
+/**
+ * Gemini session format:
+ * { messages: [{ type: "gemini", content: "text..." }, ...] }
+ */
+function parseGeminiNewModels(raw: string, skipCount: number): string[] {
   try {
-    const data = JSON.parse(content);
-    const messages: Array<{ role: string; parts?: Array<{ text?: string }> }> =
-      Array.isArray(data) ? data : (data.messages ?? data.history ?? []);
+    const data = JSON.parse(raw);
+    const messages: Array<{ type?: string; content?: unknown }> =
+      data.messages ?? [];
 
-    let modelIdx = 0;
+    let geminiIdx = 0;
     const texts: string[] = [];
 
     for (const msg of messages) {
-      if (msg.role !== "model") continue;
-      modelIdx++;
-      if (modelIdx <= skipCount) continue;
+      if (msg.type !== "gemini") continue;
+      geminiIdx++;
+      if (geminiIdx <= skipCount) continue;
 
-      const t = (msg.parts ?? [])
-        .filter((p) => p.text)
-        .map((p) => p.text as string);
-
-      if (t.length > 0) texts.push(t.join("\n"));
+      // content is a string in Gemini's format
+      if (typeof msg.content === "string" && msg.content.length > 0) {
+        texts.push(msg.content);
+      }
     }
 
     return texts;
@@ -152,6 +189,21 @@ function parseGeminiNewModels(content: string, skipCount: number): string[] {
   }
 }
 
+function countGeminiModels(raw: string): number {
+  try {
+    const data = JSON.parse(raw);
+    const messages: Array<{ type?: string }> = data.messages ?? [];
+    return messages.filter((m) => m.type === "gemini").length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Codex rollout JSONL format:
+ * { type: "response_item", payload: { type: "message", role: "assistant",
+ *   content: [{ type: "output_text", text: "..." }] } }
+ */
 function parseCodexNewLines(lines: string[]): string[] {
   const texts: string[] = [];
 
@@ -159,14 +211,10 @@ function parseCodexNewLines(lines: string[]): string[] {
     if (!line.trim()) continue;
     try {
       const ev = JSON.parse(line);
-      const payload = ev.payload ?? ev;
+      if (ev.type !== "response_item") continue;
 
-      const isResponse =
-        ev.type === "response_item" ||
-        ev.type === "message" ||
-        payload.role === "assistant";
-
-      if (!isResponse) continue;
+      const payload = ev.payload;
+      if (payload?.role !== "assistant") continue;
 
       const c = payload.content;
       if (typeof c === "string") {
@@ -187,20 +235,6 @@ function parseCodexNewLines(lines: string[]): string[] {
   }
 
   return texts;
-}
-
-// ─── Count existing model messages (Gemini only) ─────────────────────
-
-function countGeminiModels(content: string): number {
-  try {
-    const data = JSON.parse(content);
-    const msgs: Array<{ role: string }> = Array.isArray(data)
-      ? data
-      : (data.messages ?? data.history ?? []);
-    return msgs.filter((m) => m.role === "model").length;
-  } catch {
-    return 0;
-  }
 }
 
 // ─── Main ────────────────────────────────────────────────────────────

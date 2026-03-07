@@ -29,28 +29,29 @@ export class IpcCoordinator {
     const targets = agents ?? [...ALL_AGENTS];
     logger.info(`broadcast → [${targets.join(", ")}]`, "ipc");
 
-    const responses: AgentResponse[] = [];
-    for (const agent of targets) {
-      try {
-        const response = await askViaConversation(agent, prompt, {
+    const results = await Promise.allSettled(
+      targets.map((agent) =>
+        askViaConversation(agent, prompt, {
           timeoutMs: this.config.defaultTimeoutMs,
-        });
-        responses.push(response);
-      } catch (error) {
-        logger.warn(
-          `Broadcast to ${agent} failed: ${error instanceof Error ? error.message : "Unknown"}`,
-          "ipc",
-        );
-        responses.push({
-          agent,
-          content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          exitCode: 1,
-          durationMs: 0,
-        });
-      }
-    }
+        }),
+      ),
+    );
 
-    return responses;
+    return results.map((result, i) => {
+      if (result.status === "fulfilled") return result.value;
+      const agent = targets[i] ?? "claude";
+      const message =
+        result.reason instanceof Error
+          ? result.reason.message
+          : "Unknown error";
+      logger.warn(`Broadcast to ${agent} failed: ${message}`, "ipc");
+      return {
+        agent,
+        content: `Error: ${message}`,
+        exitCode: 1,
+        durationMs: 0,
+      };
+    });
   }
 
   async assignTask(
