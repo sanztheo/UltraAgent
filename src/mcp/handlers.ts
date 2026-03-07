@@ -30,7 +30,37 @@ function findChefPane() {
 }
 
 function buildReportInstruction(taskId: string): string {
-  return `\n\n[Task ${taskId}] When done, call ultra_report_complete(task_id="${taskId}", result="<your answer>"). Do NOT repeat the answer in chat — only send it via the tool.`;
+  return `\n\n[Task ${taskId}] When done, call ultra_report_complete(task_id="${taskId}"). Your output is captured automatically — no need to pass the result.`;
+}
+
+/** Capture the worker's pane output since the task prompt was sent */
+async function captureWorkerOutput(
+  agent: AgentName,
+  taskId: string,
+): Promise<string> {
+  const pane = findAgentPane(agent);
+  if (!pane) return "[Could not capture — pane not found]";
+
+  const raw = await tmuxCapturePane(pane.paneId, { fullScrollback: true });
+
+  // Extract everything after the task marker we injected
+  const taskMarker = `[Task ${taskId}]`;
+  const markerIdx = raw.lastIndexOf(taskMarker);
+  let output: string;
+  if (markerIdx !== -1) {
+    output = raw.slice(markerIdx + taskMarker.length);
+  } else {
+    // Fallback: last 80 lines
+    output = raw.split("\n").slice(-80).join("\n");
+  }
+
+  // Strip the ultra_report_complete call itself from the captured output
+  const reportIdx = output.lastIndexOf("ultra_report_complete");
+  if (reportIdx !== -1) {
+    output = output.slice(0, reportIdx);
+  }
+
+  return output.trim() || "[Empty output]";
 }
 
 async function sendToWorkerPane(
@@ -134,7 +164,7 @@ export function createAssignTaskHandler() {
 export function createReportCompleteHandler() {
   return async (args: {
     task_id: string;
-    result: string;
+    result?: string;
     exit_code?: number;
   }): Promise<ToolResult> => {
     try {
@@ -150,9 +180,15 @@ export function createReportCompleteHandler() {
         });
       }
 
+      // If result provided, use it. Otherwise, auto-capture from worker's pane.
+      let content = args.result;
+      if (!content) {
+        content = await captureWorkerOutput(entry.agent, args.task_id);
+      }
+
       const agentResult: AgentResponse = {
         agent: entry.agent,
-        content: args.result,
+        content,
         exitCode,
         durationMs: Date.now() - entry.startedAt,
       };

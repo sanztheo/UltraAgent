@@ -39,8 +39,10 @@ export const reportCompleteInputSchema = {
   task_id: z.string().min(1).describe("The task ID to report as complete"),
   result: z
     .string()
-    .min(1)
-    .describe("The task result content (your complete response)"),
+    .optional()
+    .describe(
+      "Optional short summary. If omitted, your full chat output is captured automatically from the terminal.",
+    ),
   exit_code: z
     .number()
     .optional()
