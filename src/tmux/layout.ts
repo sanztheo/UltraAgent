@@ -1,6 +1,6 @@
-import type { TmuxLayout } from "../config/types.js";
-import { tmuxSelectLayout, tmuxListPanes, tmuxSelectPane } from "./commands.js";
-import { logger } from "../utils/logger.js";
+import type { TmuxLayout } from '../config/types.js';
+import { logger } from '../utils/logger.js';
+import { tmuxListPanes, tmuxSelectLayout, tmuxSelectPane } from './commands.js';
 
 export interface LayoutStrategy {
   apply(sessionName: string, paneCount: number): Promise<void>;
@@ -9,7 +9,7 @@ export interface LayoutStrategy {
 function createTiledLayout(): LayoutStrategy {
   return {
     async apply(sessionName: string): Promise<void> {
-      await tmuxSelectLayout(sessionName, "tiled");
+      await tmuxSelectLayout(sessionName, 'tiled');
     },
   };
 }
@@ -21,7 +21,7 @@ function createMainVerticalLayout(): LayoutStrategy {
         return;
       }
       // Chef gets 50% left, workers stacked on the right
-      await tmuxSelectLayout(sessionName, "main-vertical");
+      await tmuxSelectLayout(sessionName, 'main-vertical');
 
       // Select the first pane (chef) and resize to 50% width
       const panes = await tmuxListPanes(sessionName);
@@ -29,10 +29,7 @@ function createMainVerticalLayout(): LayoutStrategy {
       if (first) {
         await tmuxSelectPane(first.id);
       }
-      logger.debug(
-        `Applied main-vertical layout (${paneCount} panes)`,
-        "layout",
-      );
+      logger.debug(`Applied main-vertical layout (${paneCount} panes)`, 'layout');
     },
   };
 }
@@ -44,28 +41,25 @@ function createMainHorizontalLayout(): LayoutStrategy {
         return;
       }
       // Chef gets 50% top, workers stacked on the bottom
-      await tmuxSelectLayout(sessionName, "main-horizontal");
+      await tmuxSelectLayout(sessionName, 'main-horizontal');
 
       const panes = await tmuxListPanes(sessionName);
       const first = panes[0];
       if (first) {
         await tmuxSelectPane(first.id);
       }
-      logger.debug(
-        `Applied main-horizontal layout (${paneCount} panes)`,
-        "layout",
-      );
+      logger.debug(`Applied main-horizontal layout (${paneCount} panes)`, 'layout');
     },
   };
 }
 
 export function createLayout(type: TmuxLayout): LayoutStrategy {
   switch (type) {
-    case "tiled":
+    case 'tiled':
       return createTiledLayout();
-    case "main-vertical":
+    case 'main-vertical':
       return createMainVerticalLayout();
-    case "main-horizontal":
+    case 'main-horizontal':
       return createMainHorizontalLayout();
   }
 }

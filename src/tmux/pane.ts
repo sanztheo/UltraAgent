@@ -1,15 +1,8 @@
-import { tmuxCapturePane } from "./commands.js";
-import { sleep } from "../utils/process.js";
-import { logger } from "../utils/logger.js";
+import { logger } from '../utils/logger.js';
+import { sleep } from '../utils/process.js';
+import { tmuxCapturePane } from './commands.js';
 
-const PROMPT_PATTERNS = [
-  /\$\s*$/m,
-  />\s*$/m,
-  /›\s*$/m,
-  /%\s*$/m,
-  /❯\s*$/m,
-  /#\s*$/m,
-];
+const PROMPT_PATTERNS = [/\$\s*$/m, />\s*$/m, /›\s*$/m, /%\s*$/m, /❯\s*$/m, /#\s*$/m];
 
 const CLI_READY_PATTERNS = [
   /claude.*>/i,
@@ -34,7 +27,7 @@ export function isPaneReady(content: string): boolean {
   }
 
   // Check last few lines for prompt characters
-  const lines = trimmed.split("\n").slice(-3);
+  const lines = trimmed.split('\n').slice(-3);
   for (const line of lines) {
     for (const pattern of PROMPT_PATTERNS) {
       if (pattern.test(line)) {
@@ -57,12 +50,12 @@ export async function waitForPaneReady(
   while (Date.now() - start < timeout) {
     const content = await tmuxCapturePane(paneTarget);
     if (isPaneReady(content)) {
-      logger.debug(`Pane ${paneTarget} is ready`, "pane");
+      logger.debug(`Pane ${paneTarget} is ready`, 'pane');
       return true;
     }
     await sleep(interval);
   }
 
-  logger.warn(`Pane ${paneTarget} not ready after ${timeout}ms`, "pane");
+  logger.warn(`Pane ${paneTarget} not ready after ${timeout}ms`, 'pane');
   return false;
 }

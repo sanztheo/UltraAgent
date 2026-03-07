@@ -1,33 +1,27 @@
-import type {
-  AgentName,
-  AgentRole,
-  PaneInfo,
-  ShellCommand,
-  TmuxLayout,
-} from "../config/types.js";
+import type { AgentName, AgentRole, PaneInfo, ShellCommand, TmuxLayout } from '../config/types.js';
+import { logger } from '../utils/logger.js';
 import {
-  tmuxHasSession,
-  tmuxNewSession,
-  tmuxKillSession,
-  tmuxSplitWindow,
-  tmuxSendKeys,
-  tmuxListPanes,
   tmuxAttach,
-} from "./commands.js";
-import { createLayout } from "./layout.js";
-import { waitForPaneReady } from "./pane.js";
-import { logger } from "../utils/logger.js";
+  tmuxHasSession,
+  tmuxKillSession,
+  tmuxListPanes,
+  tmuxNewSession,
+  tmuxSendKeys,
+  tmuxSplitWindow,
+} from './commands.js';
+import { createLayout } from './layout.js';
+import { waitForPaneReady } from './pane.js';
 
 export {
   tmuxHasSession,
   tmuxKillSession,
   tmuxCapturePane,
   tmuxSendKeys,
-} from "./commands.js";
-export { createLayout } from "./layout.js";
-export { waitForPaneReady, isPaneReady } from "./pane.js";
+} from './commands.js';
+export { createLayout } from './layout.js';
+export { waitForPaneReady, isPaneReady } from './pane.js';
 
-const CTX = "session";
+const CTX = 'session';
 
 export async function createSession(config: {
   sessionName: string;
@@ -36,10 +30,7 @@ export async function createSession(config: {
 }): Promise<void> {
   const exists = await tmuxHasSession(config.sessionName);
   if (exists) {
-    logger.warn(
-      `Session "${config.sessionName}" already exists, destroying first`,
-      CTX,
-    );
+    logger.warn(`Session "${config.sessionName}" already exists, destroying first`, CTX);
     await tmuxKillSession(config.sessionName);
   }
 
@@ -65,19 +56,12 @@ export async function addPane(
 
   const ready = await waitForPaneReady(paneId, { timeoutMs: 5_000 });
 
-  logger.info(
-    `Pane ${paneId} added for ${agent} (${role}), ready=${ready}`,
-    CTX,
-  );
+  logger.info(`Pane ${paneId} added for ${agent} (${role}), ready=${ready}`, CTX);
 
   return { paneId, agent, role, ready };
 }
 
-export async function applyLayout(
-  sessionName: string,
-  layout: TmuxLayout,
-  paneCount: number,
-): Promise<void> {
+export async function applyLayout(sessionName: string, layout: TmuxLayout, paneCount: number): Promise<void> {
   const strategy = createLayout(layout);
   await strategy.apply(sessionName, paneCount);
   logger.info(`Layout "${layout}" applied to "${sessionName}"`, CTX);
@@ -86,24 +70,19 @@ export async function applyLayout(
 export async function destroySession(sessionName: string): Promise<void> {
   const exists = await tmuxHasSession(sessionName);
   if (!exists) {
-    logger.debug(
-      `Session "${sessionName}" does not exist, nothing to destroy`,
-      CTX,
-    );
+    logger.debug(`Session "${sessionName}" does not exist, nothing to destroy`, CTX);
     return;
   }
   await tmuxKillSession(sessionName);
   logger.info(`Session "${sessionName}" destroyed`, CTX);
 }
 
-export async function getSessionPanes(
-  sessionName: string,
-): Promise<PaneInfo[]> {
+export async function getSessionPanes(sessionName: string): Promise<PaneInfo[]> {
   const rawPanes = await tmuxListPanes(sessionName);
   return rawPanes.map((pane) => ({
     paneId: pane.id,
-    agent: "claude" as AgentName,
-    role: (pane.index === 0 ? "chef" : "worker") as AgentRole,
+    agent: 'claude' as AgentName,
+    role: (pane.index === 0 ? 'chef' : 'worker') as AgentRole,
     ready: false,
   }));
 }
@@ -124,9 +103,9 @@ function buildCommandString(cmd: ShellCommand): string {
   const envPrefix = cmd.env
     ? Object.entries(cmd.env)
         .map(([k, v]) => `${k}=${shellEscape(v)}`)
-        .join(" ") + " "
-    : "";
-  const args = cmd.args.map(shellEscape).join(" ");
+        .join(' ') + ' '
+    : '';
+  const args = cmd.args.map(shellEscape).join(' ');
   return `${envPrefix}${cmd.command} ${args}`;
 }
 
