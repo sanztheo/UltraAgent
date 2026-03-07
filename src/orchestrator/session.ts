@@ -71,9 +71,7 @@ export async function startSession(
 
   // Step 3: Register MCP server for chef
   const mcpCommand = "node";
-  const mcpArgs = [
-    resolve(import.meta.dirname, "../../dist/bin/ultraagent-mcp.js"),
-  ];
+  const mcpArgs = [resolve(import.meta.dirname, "../../bin/ultraagent-mcp.js")];
   try {
     await chefAdapter.registerMcpServer("ultraagent", mcpCommand, mcpArgs);
     logger.info("MCP server registered for chef", "session");
