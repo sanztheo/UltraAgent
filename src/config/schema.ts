@@ -1,13 +1,9 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const agentNameSchema = z.enum(["claude", "codex", "gemini"]);
-export const agentRoleSchema = z.enum(["chef", "worker"]);
-export const permissionModeSchema = z.enum(["default", "auto", "yolo"]);
-export const tmuxLayoutSchema = z.enum([
-  "tiled",
-  "main-vertical",
-  "main-horizontal",
-]);
+export const agentNameSchema = z.enum(['claude', 'codex', 'gemini']);
+export const agentRoleSchema = z.enum(['chef', 'worker']);
+export const permissionModeSchema = z.enum(['default', 'auto', 'yolo']);
+export const tmuxLayoutSchema = z.enum(['tiled', 'main-vertical', 'main-horizontal']);
 
 export const tmuxConfigSchema = z.object({
   layout: tmuxLayoutSchema,
