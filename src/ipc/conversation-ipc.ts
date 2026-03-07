@@ -304,8 +304,13 @@ export async function askViaConversation(
   const pane = state.panes.find((p) => p.agent === agentName);
   if (!pane) throw new Error(`No pane found for agent "${agentName}"`);
 
-  await tmuxSendKeys(pane.paneId, prompt);
-  logger.debug(`Prompt sent to ${agentName} pane`, CTX);
+  // Flatten newlines — tmux send-keys -l treats \n as Enter keypresses
+  const flatPrompt = prompt.replace(/\n+/g, " ").trim();
+  await tmuxSendKeys(pane.paneId, flatPrompt);
+  logger.debug(
+    `Prompt sent to ${agentName} pane (${flatPrompt.length} chars)`,
+    CTX,
+  );
 
   // 3. Wait for agent to start processing
   await sleep(3_000);
