@@ -64,9 +64,9 @@ export class CodexAdapter extends BaseAdapter {
       case "default":
         return [];
       case "auto":
-        return ["--auto-edit"];
-      case "yolo":
         return ["--full-auto"];
+      case "yolo":
+        return ["--dangerously-bypass-approvals-and-sandbox"];
     }
   }
 }

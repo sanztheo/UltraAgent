@@ -60,9 +60,9 @@ export class GeminiAdapter extends BaseAdapter {
       case "default":
         return [];
       case "auto":
-        return [];
+        return ["--approval-mode", "auto_edit"];
       case "yolo":
-        return ["--sandbox=none"];
+        return ["-y"];
     }
   }
 }
