@@ -1,42 +1,32 @@
-import type {
-  UltraAgentConfig,
-  PaneInfo,
-  SessionState,
-} from "../config/types.js";
-import { createAdapter } from "../adapters/index.js";
+import { resolve } from 'node:path';
+import { createAdapter } from '../adapters/index.js';
+import type { PaneInfo, SessionState, UltraAgentConfig } from '../config/types.js';
+import { generateChefInstructions } from '../instructions/chef-prompt.js';
+import { generateWorkerInstructions } from '../instructions/worker-prompt.js';
 import {
-  createSession as tmuxCreateSession,
   addPane,
   applyLayout,
-  destroySession,
   attachToSession,
+  destroySession,
   isSessionActive,
-} from "../tmux/index.js";
-import { generateChefInstructions } from "../instructions/chef-prompt.js";
-import { generateWorkerInstructions } from "../instructions/worker-prompt.js";
-import { saveState, loadState, clearState, hasActiveSession } from "./state.js";
-import { projectName } from "../utils/paths.js";
-import { logger } from "../utils/logger.js";
-import { resolve } from "node:path";
+  createSession as tmuxCreateSession,
+} from '../tmux/index.js';
+import { logger } from '../utils/logger.js';
+import { projectName } from '../utils/paths.js';
+import { clearState, hasActiveSession, loadState, saveState } from './state.js';
 
 function buildSessionName(config: UltraAgentConfig, cwd: string): string {
   return `${config.tmux.session_prefix}-${projectName(cwd)}`;
 }
 
-export async function startSession(
-  config: UltraAgentConfig,
-  cwd: string,
-): Promise<void> {
+export async function startSession(config: UltraAgentConfig, cwd: string): Promise<void> {
   const resolvedCwd = resolve(cwd);
   const sessionName = buildSessionName(config, resolvedCwd);
 
   if (hasActiveSession(resolvedCwd)) {
     const existing = loadState(resolvedCwd);
     if (existing && (await isSessionActive(existing.sessionName))) {
-      logger.warn(
-        `Session "${existing.sessionName}" is already running. Use 'ultraagent stop' first.`,
-        "session",
-      );
+      logger.warn(`Session "${existing.sessionName}" is already running. Use 'ultraagent stop' first.`, 'session');
       await attachToSession(existing.sessionName);
       return;
     }
@@ -46,11 +36,8 @@ export async function startSession(
   const workers = config.agents.filter((a) => a !== config.chef);
   const name = projectName(resolvedCwd);
 
-  logger.info(`Starting UltraAgent session: ${sessionName}`, "session");
-  logger.info(
-    `Chef: ${config.chef} | Workers: ${workers.join(", ")}`,
-    "session",
-  );
+  logger.info(`Starting UltraAgent session: ${sessionName}`, 'session');
+  logger.info(`Chef: ${config.chef} | Workers: ${workers.join(', ')}`, 'session');
 
   // Step 1: Create tmux session
   await tmuxCreateSession({
@@ -67,38 +54,35 @@ export async function startSession(
     mcpAvailable: true,
     projectName: name,
   });
-  await chefAdapter.injectInstructions("chef", chefInstructions, resolvedCwd);
+  await chefAdapter.injectInstructions('chef', chefInstructions, resolvedCwd);
 
   // Step 3: Register MCP server for chef
-  const mcpCommand = "node";
-  const mcpArgs = [resolve(import.meta.dirname, "../../bin/ultraagent-mcp.js")];
+  const mcpCommand = 'node';
+  const mcpArgs = [resolve(import.meta.dirname, '../../bin/ultraagent-mcp.js')];
   try {
-    await chefAdapter.registerMcpServer("ultraagent", mcpCommand, mcpArgs);
-    logger.info("MCP server registered for chef", "session");
+    await chefAdapter.registerMcpServer('ultraagent', mcpCommand, mcpArgs);
+    logger.info('MCP server registered for chef', 'session');
   } catch (error) {
-    logger.warn(
-      `Failed to register MCP server: ${error instanceof Error ? error.message : String(error)}`,
-      "session",
-    );
+    logger.warn(`Failed to register MCP server: ${error instanceof Error ? error.message : String(error)}`, 'session');
   }
 
   // Step 4: Launch chef in the first pane (pane 0)
   const chefLaunchCmd = await chefAdapter.getInteractiveLaunchCommand({
-    role: "chef",
+    role: 'chef',
     cwd: resolvedCwd,
     permissionMode: config.permissions.chef_mode,
   });
   const panes: PaneInfo[] = [];
 
   // Send chef command to pane 0 (the default pane created with the session)
-  const { tmuxSendKeys } = await import("../tmux/commands.js");
+  const { tmuxSendKeys } = await import('../tmux/commands.js');
   const chefPaneTarget = `${sessionName}:0.0`;
-  const chefCmdStr = [chefLaunchCmd.command, ...chefLaunchCmd.args].join(" ");
+  const chefCmdStr = [chefLaunchCmd.command, ...chefLaunchCmd.args].join(' ');
   await tmuxSendKeys(chefPaneTarget, chefCmdStr);
   panes.push({
     paneId: chefPaneTarget,
     agent: config.chef,
-    role: "chef",
+    role: 'chef',
     ready: true,
   });
 
@@ -107,44 +91,37 @@ export async function startSession(
     const workerAdapter = createAdapter(workerName);
     const available = await workerAdapter.isAvailable();
     if (!available) {
-      logger.warn(`Worker ${workerName} is not available, skipping`, "session");
+      logger.warn(`Worker ${workerName} is not available, skipping`, 'session');
       continue;
     }
 
     const workerInstructions = generateWorkerInstructions({
       agentName: workerName,
-      role: "worker",
+      role: 'worker',
       chefName: config.chef,
       projectName: name,
     });
-    await workerAdapter.injectInstructions(
-      "worker",
-      workerInstructions,
-      resolvedCwd,
-    );
+    await workerAdapter.injectInstructions('worker', workerInstructions, resolvedCwd);
 
     // Register MCP server with each worker so they can call ultra_report_complete
     try {
-      await workerAdapter.registerMcpServer("ultraagent", mcpCommand, mcpArgs);
-      logger.info(`MCP server registered for worker ${workerName}`, "session");
+      await workerAdapter.registerMcpServer('ultraagent', mcpCommand, mcpArgs);
+      logger.info(`MCP server registered for worker ${workerName}`, 'session');
     } catch (error) {
       logger.warn(
         `Failed to register MCP for ${workerName}: ${error instanceof Error ? error.message : String(error)}`,
-        "session",
+        'session',
       );
     }
 
     // Create pane and launch worker's interactive CLI
-    const paneInfo = await addPane(sessionName, workerName, "worker");
+    const paneInfo = await addPane(sessionName, workerName, 'worker');
     const workerLaunchCmd = await workerAdapter.getInteractiveLaunchCommand({
-      role: "worker",
+      role: 'worker',
       cwd: resolvedCwd,
       permissionMode: config.permissions.worker_mode,
     });
-    const workerCmdStr = [
-      workerLaunchCmd.command,
-      ...workerLaunchCmd.args,
-    ].join(" ");
+    const workerCmdStr = [workerLaunchCmd.command, ...workerLaunchCmd.args].join(' ');
     await tmuxSendKeys(paneInfo.paneId, workerCmdStr);
     panes.push(paneInfo);
   }
@@ -174,23 +151,21 @@ export async function stopSession(cwd: string): Promise<void> {
 
   const state = loadState(resolvedCwd);
   if (!state) {
-    logger.warn("No active session found", "session");
+    logger.warn('No active session found', 'session');
     return;
   }
 
-  logger.info(`Stopping session "${state.sessionName}"...`, "session");
+  logger.info(`Stopping session "${state.sessionName}"...`, 'session');
 
   if (await isSessionActive(state.sessionName)) {
     await destroySession(state.sessionName);
   }
 
   clearState(resolvedCwd);
-  logger.success("UltraAgent session stopped");
+  logger.success('UltraAgent session stopped');
 }
 
-export async function getSessionStatus(
-  cwd: string,
-): Promise<SessionState | undefined> {
+export async function getSessionStatus(cwd: string): Promise<SessionState | undefined> {
   const resolvedCwd = resolve(cwd);
   const state = loadState(resolvedCwd);
 
