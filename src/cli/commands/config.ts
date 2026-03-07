@@ -13,64 +13,72 @@ const ALL_AGENTS: AgentName[] = ["claude", "codex", "gemini"];
 
 type MenuAction =
   | "chef"
-  | "workers"
   | "layout"
   | "worker-mode"
   | "chef-mode"
   | "save"
   | "save-global"
-  | "discard";
-
-function tag(value: string, active: boolean): string {
-  if (active) return chalk.green(`● ${value}`);
-  return chalk.dim(`○ ${value}`);
-}
+  | "discard"
+  | `toggle:${AgentName}`;
 
 function buildMenuOptions(
   config: UltraAgentConfig,
+  available: AgentName[],
 ): Array<{ value: MenuAction; label: string; hint?: string }> {
   const workers = config.agents.filter((a) => a !== config.chef);
 
-  return [
+  const items: Array<{ value: MenuAction; label: string; hint?: string }> = [
     {
-      value: "chef" as MenuAction,
-      label: `Chef              ${chalk.cyan(config.chef)}`,
+      value: "chef",
+      label: `  Chef              ${chalk.cyan.bold(config.chef)}`,
+    },
+  ];
+
+  // Individual worker toggles
+  for (const agent of available) {
+    if (agent === config.chef) continue;
+    const active = workers.includes(agent);
+    const icon = active ? chalk.green("●") : chalk.dim("○");
+    const name = active ? chalk.white(agent) : chalk.dim(agent);
+    items.push({
+      value: `toggle:${agent}`,
+      label: `  ${icon} ${name}`,
+      hint: active
+        ? "enabled — select to disable"
+        : "disabled — select to enable",
+    });
+  }
+
+  items.push(
+    {
+      value: "layout",
+      label: `  Layout            ${chalk.yellow(config.tmux.layout)}`,
     },
     {
-      value: "workers" as MenuAction,
-      label: `Workers           ${workers.map((w) => tag(w, true)).join("  ")}${ALL_AGENTS.filter(
-        (a) => a !== config.chef && !workers.includes(a),
-      )
-        .map((w) => tag(w, false))
-        .join("  ")}`,
+      value: "chef-mode",
+      label: `  Chef mode         ${chalk.magenta(config.permissions.chef_mode)}`,
     },
     {
-      value: "layout" as MenuAction,
-      label: `Layout            ${chalk.yellow(config.tmux.layout)}`,
+      value: "worker-mode",
+      label: `  Worker mode       ${chalk.magenta(config.permissions.worker_mode)}`,
     },
     {
-      value: "chef-mode" as MenuAction,
-      label: `Chef mode         ${chalk.magenta(config.permissions.chef_mode)}`,
-    },
-    {
-      value: "worker-mode" as MenuAction,
-      label: `Worker mode       ${chalk.magenta(config.permissions.worker_mode)}`,
-    },
-    {
-      value: "save" as MenuAction,
-      label: chalk.green.bold("  Save to project"),
+      value: "save",
+      label: chalk.green.bold("  ↵ Save to project"),
       hint: ".ultraagent.json",
     },
     {
-      value: "save-global" as MenuAction,
-      label: chalk.green("  Save globally"),
+      value: "save-global",
+      label: chalk.green("  ↵ Save globally"),
       hint: "~/.ultraagent/config.json",
     },
     {
-      value: "discard" as MenuAction,
-      label: chalk.dim("  Discard & exit"),
+      value: "discard",
+      label: chalk.dim("    Discard & exit"),
     },
-  ];
+  );
+
+  return items;
 }
 
 export async function configCommand(): Promise<void> {
@@ -93,11 +101,10 @@ export async function configCommand(): Promise<void> {
 
   let dirty = false;
 
-  // Main menu loop
   while (true) {
     const action = await p.select<MenuAction>({
       message: dirty ? chalk.yellow("Settings (modified)") : "Settings",
-      options: buildMenuOptions(config),
+      options: buildMenuOptions(config, available),
     });
 
     if (p.isCancel(action)) {
@@ -109,6 +116,21 @@ export async function configCommand(): Promise<void> {
       }
       p.cancel("Discarded");
       return;
+    }
+
+    // Worker toggle — instant, no sub-menu
+    if (action.startsWith("toggle:")) {
+      const agent = action.slice(7) as AgentName;
+      const workers = config.agents.filter((a) => a !== config.chef);
+      const isActive = workers.includes(agent);
+
+      const newWorkers = isActive
+        ? workers.filter((w) => w !== agent)
+        : [...workers, agent];
+
+      config = { ...config, agents: [config.chef, ...newWorkers] };
+      dirty = true;
+      continue; // back to menu immediately
     }
 
     switch (action) {
@@ -126,42 +148,7 @@ export async function configCommand(): Promise<void> {
           const workers = config.agents.filter(
             (a) => a !== config.chef && a !== chef,
           );
-          config = {
-            ...config,
-            chef,
-            agents: [chef, ...workers],
-          };
-          dirty = true;
-        }
-        break;
-      }
-
-      case "workers": {
-        const workerOptions = available.filter((n) => n !== config.chef);
-        const currentWorkers = config.agents.filter((a) => a !== config.chef);
-
-        if (workerOptions.length === 0) {
-          p.log.warn("No other CLIs installed.");
-          break;
-        }
-
-        const selected = await p.multiselect({
-          message: "Toggle workers",
-          options: workerOptions.map((name) => ({
-            value: name,
-            label: name,
-          })),
-          initialValues: currentWorkers.filter((w) =>
-            workerOptions.includes(w),
-          ),
-          required: false,
-        });
-
-        if (!p.isCancel(selected)) {
-          config = {
-            ...config,
-            agents: [config.chef, ...selected],
-          };
+          config = { ...config, chef, agents: [chef, ...workers] };
           dirty = true;
         }
         break;
