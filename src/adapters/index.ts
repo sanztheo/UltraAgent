@@ -1,8 +1,8 @@
-import type { AgentName } from "../config/types.js";
-import type { CliAdapter } from "./types.js";
-import { ClaudeAdapter } from "./claude.js";
-import { CodexAdapter } from "./codex.js";
-import { GeminiAdapter } from "./gemini.js";
+import type { AgentName } from '../config/types.js';
+import { ClaudeAdapter } from './claude.js';
+import { CodexAdapter } from './codex.js';
+import { GeminiAdapter } from './gemini.js';
+import type { CliAdapter } from './types.js';
 
 const ADAPTERS: Record<AgentName, () => CliAdapter> = {
   claude: () => new ClaudeAdapter(),
@@ -25,4 +25,4 @@ export async function getAvailableAdapters(): Promise<CliAdapter[]> {
   return checks.filter((c) => c.available).map((c) => c.adapter);
 }
 
-export type { CliAdapter } from "./types.js";
+export type { CliAdapter } from './types.js';
