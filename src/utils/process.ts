@@ -1,5 +1,5 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -12,10 +12,7 @@ export async function isProcessRunning(pid: number): Promise<boolean> {
   }
 }
 
-export async function killProcess(
-  pid: number,
-  signal: NodeJS.Signals = "SIGTERM",
-): Promise<void> {
+export async function killProcess(pid: number, signal: NodeJS.Signals = 'SIGTERM'): Promise<void> {
   try {
     process.kill(pid, signal);
   } catch {
