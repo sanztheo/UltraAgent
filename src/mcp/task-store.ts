@@ -1,16 +1,10 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  readdirSync,
-} from "node:fs";
-import { join } from "node:path";
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { tasksDir } from "../utils/paths.js";
-import { logger } from "../utils/logger.js";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { logger } from '../utils/logger.js';
+import { tasksDir } from '../utils/paths.js';
 
-export type TaskStatus = "running" | "done" | "error";
+export type TaskStatus = 'running' | 'done' | 'error';
 
 export interface TaskEntry {
   id: string;
@@ -41,32 +35,29 @@ export function createTask(agent: AgentName, description: string): TaskEntry {
     id: generateId(),
     agent,
     description,
-    status: "running",
+    status: 'running',
     startedAt: Date.now(),
   };
   writeFileSync(taskFilePath(entry.id), JSON.stringify(entry, null, 2));
-  logger.info(`Task ${entry.id} created for ${agent}`, "task-store");
+  logger.info(`Task ${entry.id} created for ${agent}`, 'task-store');
   return entry;
 }
 
 export function completeTask(id: string, result: AgentResponse): void {
   const entry = getTask(id);
   if (!entry) return;
-  entry.status = result.exitCode === 0 ? "done" : "error";
+  entry.status = result.exitCode === 0 ? 'done' : 'error';
   entry.completedAt = Date.now();
   entry.result = result;
   writeFileSync(taskFilePath(id), JSON.stringify(entry, null, 2));
-  logger.info(
-    `Task ${id} completed (${entry.status}, ${entry.completedAt - entry.startedAt}ms)`,
-    "task-store",
-  );
+  logger.info(`Task ${id} completed (${entry.status}, ${entry.completedAt - entry.startedAt}ms)`, 'task-store');
 }
 
 export function getTask(id: string): TaskEntry | undefined {
   const path = taskFilePath(id);
   if (!existsSync(path)) return undefined;
   try {
-    return JSON.parse(readFileSync(path, "utf-8")) as TaskEntry;
+    return JSON.parse(readFileSync(path, 'utf-8')) as TaskEntry;
   } catch {
     return undefined;
   }
@@ -75,11 +66,11 @@ export function getTask(id: string): TaskEntry | undefined {
 export function listTasks(): TaskEntry[] {
   const dir = getTasksDir();
   if (!existsSync(dir)) return [];
-  const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
   const tasks: TaskEntry[] = [];
   for (const file of files) {
     try {
-      const content = readFileSync(join(dir, file), "utf-8");
+      const content = readFileSync(join(dir, file), 'utf-8');
       tasks.push(JSON.parse(content) as TaskEntry);
     } catch {
       /* skip corrupt files */

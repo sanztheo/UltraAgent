@@ -1,21 +1,21 @@
-import type { AgentName, AgentResponse } from "../config/types.js";
-import { createTask, completeTask, getTask, listTasks } from "./task-store.js";
-import { tmuxCapturePane, tmuxSendKeys } from "../tmux/commands.js";
-import { loadState } from "../orchestrator/state.js";
-import { logger } from "../utils/logger.js";
+import type { AgentName, AgentResponse } from '../config/types.js';
+import { loadState } from '../orchestrator/state.js';
+import { tmuxCapturePane, tmuxSendKeys } from '../tmux/commands.js';
+import { logger } from '../utils/logger.js';
+import { completeTask, createTask, getTask, listTasks } from './task-store.js';
 
-type ToolResult = { content: Array<{ type: "text"; text: string }> };
+type ToolResult = { content: Array<{ type: 'text'; text: string }> };
 
 function jsonResponse(data: unknown): ToolResult {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
   };
 }
 
 function errorResponse(error: unknown): ToolResult {
   const message = error instanceof Error ? error.message : String(error);
   return {
-    content: [{ type: "text" as const, text: `Error: ${message}` }],
+    content: [{ type: 'text' as const, text: `Error: ${message}` }],
   };
 }
 
@@ -26,7 +26,7 @@ function findAgentPane(agent: AgentName) {
 
 function findChefPane() {
   const state = loadState(process.cwd());
-  return state?.panes.find((p) => p.role === "chef");
+  return state?.panes.find((p) => p.role === 'chef');
 }
 
 function buildReportInstruction(taskId: string): string {
@@ -34,12 +34,9 @@ function buildReportInstruction(taskId: string): string {
 }
 
 /** Capture the worker's pane output since the task prompt was sent */
-async function captureWorkerOutput(
-  agent: AgentName,
-  taskId: string,
-): Promise<string> {
+async function captureWorkerOutput(agent: AgentName, taskId: string): Promise<string> {
   const pane = findAgentPane(agent);
-  if (!pane) return "[Could not capture — pane not found]";
+  if (!pane) return '[Could not capture — pane not found]';
 
   const raw = await tmuxCapturePane(pane.paneId, { fullScrollback: true });
 
@@ -51,56 +48,41 @@ async function captureWorkerOutput(
     output = raw.slice(markerIdx + taskMarker.length);
   } else {
     // Fallback: last 80 lines
-    output = raw.split("\n").slice(-80).join("\n");
+    output = raw.split('\n').slice(-80).join('\n');
   }
 
   // Strip the ultra_report_complete call itself from the captured output
-  const reportIdx = output.lastIndexOf("ultra_report_complete");
+  const reportIdx = output.lastIndexOf('ultra_report_complete');
   if (reportIdx !== -1) {
     output = output.slice(0, reportIdx);
   }
 
-  return output.trim() || "[Empty output]";
+  return output.trim() || '[Empty output]';
 }
 
-async function sendToWorkerPane(
-  agent: AgentName,
-  message: string,
-): Promise<void> {
+async function sendToWorkerPane(agent: AgentName, message: string): Promise<void> {
   const pane = findAgentPane(agent);
   if (!pane) throw new Error(`No pane found for agent "${agent}"`);
   await tmuxSendKeys(pane.paneId, message);
 }
 
-async function notifyChef(
-  taskId: string,
-  agent: AgentName,
-  result: AgentResponse,
-): Promise<void> {
+async function notifyChef(taskId: string, agent: AgentName, result: AgentResponse): Promise<void> {
   try {
     const chefPane = findChefPane();
     if (!chefPane) return;
 
-    const status = result.exitCode === 0 ? "done" : "error";
-    const content =
-      result.content.length > 2000
-        ? `${result.content.slice(0, 2000)}\n...(truncated)`
-        : result.content;
+    const status = result.exitCode === 0 ? 'done' : 'error';
+    const content = result.content.length > 2000 ? `${result.content.slice(0, 2000)}\n...(truncated)` : result.content;
 
-    const notification = [
-      `[UltraAgent] Worker ${agent} finished task ${taskId} (${status}).`,
-      `Result:`,
-      content,
-    ].join(" ");
+    const notification = [`[UltraAgent] Worker ${agent} finished task ${taskId} (${status}).`, `Result:`, content].join(
+      ' ',
+    );
 
     await new Promise((r) => setTimeout(r, 1_000));
     await tmuxSendKeys(chefPane.paneId, notification);
-    logger.info(`Chef notified about task ${taskId}`, "mcp");
+    logger.info(`Chef notified about task ${taskId}`, 'mcp');
   } catch (error) {
-    logger.warn(
-      `Failed to notify chef: ${error instanceof Error ? error.message : String(error)}`,
-      "mcp",
-    );
+    logger.warn(`Failed to notify chef: ${error instanceof Error ? error.message : String(error)}`, 'mcp');
   }
 }
 
@@ -119,7 +101,7 @@ export function createAskAgentHandler() {
       return jsonResponse({
         taskId: entry.id,
         agent: args.agent,
-        status: "running",
+        status: 'running',
         message: `Question sent to ${args.agent}. Worker will call ultra_report_complete when done.`,
       });
     } catch (error) {
@@ -138,21 +120,21 @@ export function createAssignTaskHandler() {
     try {
       const entry = createTask(args.agent, args.task);
 
-      const parts = [`[UltraAgent Task ${entry.id}]`, "", args.task];
+      const parts = [`[UltraAgent Task ${entry.id}]`, '', args.task];
       if (args.can_code) {
-        parts.push("", "You are allowed to write and modify code.");
+        parts.push('', 'You are allowed to write and modify code.');
       }
       if (args.files && args.files.length > 0) {
-        parts.push("", `Relevant files: ${args.files.join(", ")}`);
+        parts.push('', `Relevant files: ${args.files.join(', ')}`);
       }
       parts.push(buildReportInstruction(entry.id));
 
-      await sendToWorkerPane(args.agent, parts.join("\n"));
+      await sendToWorkerPane(args.agent, parts.join('\n'));
 
       return jsonResponse({
         taskId: entry.id,
         agent: args.agent,
-        status: "running",
+        status: 'running',
         message: `Task assigned to ${args.agent}. Worker will call ultra_report_complete when done.`,
       });
     } catch (error) {
@@ -174,7 +156,7 @@ export function createReportCompleteHandler() {
       if (!entry) {
         return jsonResponse({ error: `Task "${args.task_id}" not found` });
       }
-      if (entry.status !== "running") {
+      if (entry.status !== 'running') {
         return jsonResponse({
           error: `Task "${args.task_id}" is already ${entry.status}`,
         });
@@ -198,7 +180,7 @@ export function createReportCompleteHandler() {
       return jsonResponse({
         ok: true,
         taskId: args.task_id,
-        status: exitCode === 0 ? "done" : "error",
+        status: exitCode === 0 ? 'done' : 'error',
       });
     } catch (error) {
       return errorResponse(error);
@@ -214,7 +196,7 @@ export function createBroadcastHandler() {
     try {
       const state = loadState(process.cwd());
       if (!state) {
-        return jsonResponse({ error: "No active UltraAgent session" });
+        return jsonResponse({ error: 'No active UltraAgent session' });
       }
 
       const targets = args.agents ?? [...state.workers];
@@ -227,8 +209,7 @@ export function createBroadcastHandler() {
           await sendToWorkerPane(agent, prompt);
           tasks.push({ taskId: entry.id, agent });
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           completeTask(entry.id, {
             agent,
             content: `Error: ${message}`,
@@ -259,13 +240,13 @@ export function createGetTaskResultHandler() {
         return jsonResponse({ error: `Task "${args.task_id}" not found` });
       }
 
-      if (entry.status !== "running") {
+      if (entry.status !== 'running') {
         return jsonResponse({
           taskId: entry.id,
           agent: entry.agent,
           status: entry.status,
           durationMs: (entry.completedAt ?? Date.now()) - entry.startedAt,
-          content: entry.result?.content ?? "[No content]",
+          content: entry.result?.content ?? '[No content]',
           exitCode: entry.result?.exitCode ?? 1,
         });
       }
@@ -275,9 +256,8 @@ export function createGetTaskResultHandler() {
 
     return jsonResponse({
       taskId: args.task_id,
-      status: "running",
-      message:
-        "Task still running after 3 min. Worker hasn't called ultra_report_complete yet.",
+      status: 'running',
+      message: "Task still running after 3 min. Worker hasn't called ultra_report_complete yet.",
     });
   };
 }
@@ -286,7 +266,7 @@ export function createListTasksHandler() {
   return async (): Promise<ToolResult> => {
     const tasks = listTasks();
     if (tasks.length === 0) {
-      return jsonResponse({ tasks: [], message: "No tasks yet." });
+      return jsonResponse({ tasks: [], message: 'No tasks yet.' });
     }
 
     const summary = tasks.map((t) => ({
@@ -306,15 +286,15 @@ export function createWatchAgentsHandler() {
     try {
       const state = loadState(process.cwd());
       if (!state) {
-        return jsonResponse({ error: "No active UltraAgent session" });
+        return jsonResponse({ error: 'No active UltraAgent session' });
       }
 
       const snapshots: Record<string, string> = {};
       for (const pane of state.panes) {
-        if (pane.role === "chef") continue;
+        if (pane.role === 'chef') continue;
         const content = await tmuxCapturePane(pane.paneId);
-        const lines = content.split("\n").filter((l) => l.trim());
-        snapshots[pane.agent] = lines.slice(-15).join("\n") || "(idle)";
+        const lines = content.split('\n').filter((l) => l.trim());
+        snapshots[pane.agent] = lines.slice(-15).join('\n') || '(idle)';
       }
 
       return jsonResponse({ agents: snapshots });
