@@ -2,7 +2,14 @@ import { tmuxCapturePane } from "./commands.js";
 import { sleep } from "../utils/process.js";
 import { logger } from "../utils/logger.js";
 
-const PROMPT_PATTERNS = [/\$\s*$/m, />\s*$/m, /%\s*$/m, /❯\s*$/m, /#\s*$/m];
+const PROMPT_PATTERNS = [
+  /\$\s*$/m,
+  />\s*$/m,
+  /›\s*$/m,
+  /%\s*$/m,
+  /❯\s*$/m,
+  /#\s*$/m,
+];
 
 const CLI_READY_PATTERNS = [
   /claude.*>/i,
@@ -19,17 +26,20 @@ export function isPaneReady(content: string): boolean {
     return false;
   }
 
-  const lastLine = trimmed.split("\n").pop() ?? "";
-
+  // Check full content for CLI-specific ready indicators
   for (const pattern of CLI_READY_PATTERNS) {
-    if (pattern.test(lastLine)) {
+    if (pattern.test(trimmed)) {
       return true;
     }
   }
 
-  for (const pattern of PROMPT_PATTERNS) {
-    if (pattern.test(lastLine)) {
-      return true;
+  // Check last few lines for prompt characters
+  const lines = trimmed.split("\n").slice(-3);
+  for (const line of lines) {
+    for (const pattern of PROMPT_PATTERNS) {
+      if (pattern.test(line)) {
+        return true;
+      }
     }
   }
 

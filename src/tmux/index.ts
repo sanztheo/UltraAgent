@@ -61,7 +61,7 @@ export async function addPane(
   const fullCommand = buildCommandString(command);
   await tmuxSendKeys(paneId, fullCommand);
 
-  const ready = await waitForPaneReady(paneId, { timeoutMs: 15_000 });
+  const ready = await waitForPaneReady(paneId, { timeoutMs: 5_000 });
 
   logger.info(
     `Pane ${paneId} added for ${agent} (${role}), ready=${ready}`,
