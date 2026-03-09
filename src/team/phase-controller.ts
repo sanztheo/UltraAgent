@@ -9,7 +9,6 @@
 import {
   createOrchestratorState,
   isTerminalPhase,
-  isValidTransition,
   transitionPhase,
   type TeamOrchestratorState,
   type TeamPhase,
