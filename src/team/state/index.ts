@@ -9,3 +9,4 @@ export * from "./tasks.js";
 export * from "./approvals.js";
 export * from "./mailbox.js";
 export * from "./dispatch.js";
+export * from "./workers.js";

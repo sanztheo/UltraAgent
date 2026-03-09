@@ -66,6 +66,14 @@ export function teamInboxDir(cwd: string): string {
   return join(teamDir(cwd), "inbox");
 }
 
+export function teamWorkersDir(cwd: string): string {
+  return join(teamDir(cwd), "workers");
+}
+
+export function teamWorkerDir(cwd: string, workerName: string): string {
+  return join(teamWorkersDir(cwd), workerName);
+}
+
 export function projectName(cwd: string): string {
   return resolve(cwd).split("/").pop() ?? "project";
 }
