@@ -10,3 +10,6 @@ export * from "./approvals.js";
 export * from "./mailbox.js";
 export * from "./dispatch.js";
 export * from "./workers.js";
+export * from "./events.js";
+export * from "./monitor.js";
+export * from "./shutdown.js";
