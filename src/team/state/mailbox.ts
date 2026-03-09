@@ -15,8 +15,6 @@ import { writeAtomic } from "./io.js";
 import { withMailboxLock } from "./locks.js";
 import type { MailboxMessage, TeamMailbox } from "./types.js";
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
 function mailboxFilePath(mailboxDir: string, workerName: string): string {
   return join(mailboxDir, `${workerName}.json`);
 }
@@ -60,8 +58,6 @@ async function ensureMailboxDir(mailboxDir: string): Promise<void> {
     await mkdir(mailboxDir, { recursive: true });
   }
 }
-
-// ── Public API ─────────────────────────────────────────────────────────
 
 export async function sendDirectMessage(
   mailboxDir: string,

@@ -13,8 +13,6 @@
 
 import type { WorkerHeartbeat, WorkerStatus } from "./state/types.js";
 
-// ── Configuration ─────────────────────────────────────────────────────
-
 export interface NudgeConfig {
   /** How long a worker can be idle before first nudge (ms). Default: 60s */
   idleThresholdMs: number;
@@ -33,8 +31,6 @@ const DEFAULT_CONFIG: NudgeConfig = {
   maxNudges: 5,
 };
 
-// ── Nudge state per worker ────────────────────────────────────────────
-
 export interface NudgeRecord {
   workerName: string;
   nudgeCount: number;
@@ -49,8 +45,6 @@ export interface NudgeDecision {
   reason: string;
   nudgeCount: number;
 }
-
-// ── NudgeTracker ──────────────────────────────────────────────────────
 
 export class NudgeTracker {
   private readonly config: NudgeConfig;

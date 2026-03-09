@@ -19,12 +19,8 @@ import { dirname, join } from "node:path";
 import { withLock } from "./state/locks.js";
 import type { TeamTask } from "./state/types.js";
 
-// ── Constants ──────────────────────────────────────────────────────────
-
 const OVERLAY_START = "<!-- ULTRAAGENT:TEAM:WORKER:START -->";
 const OVERLAY_END = "<!-- ULTRAAGENT:TEAM:WORKER:END -->";
-
-// ── Overlay generation ─────────────────────────────────────────────────
 
 export function generateWorkerOverlay(): string {
   return `${OVERLAY_START}
@@ -60,8 +56,6 @@ When notified about mailbox messages:
 </team_worker_protocol>
 ${OVERLAY_END}`;
 }
-
-// ── Overlay application ────────────────────────────────────────────────
 
 function stripOverlayFromContent(content: string): string {
   const startIdx = content.indexOf(OVERLAY_START);
@@ -114,8 +108,6 @@ export async function stripWorkerOverlay(agentsMdPath: string): Promise<void> {
     },
   );
 }
-
-// ── Inbox generation ───────────────────────────────────────────────────
 
 export interface InboxOptions {
   workerRole?: string;
@@ -216,8 +208,6 @@ All tasks are complete. Please wrap up any remaining work and respond with a shu
 3. Exit your session.
 `;
 }
-
-// ── Trigger messages (short, < 200 chars, ASCII-safe) ──────────────────
 
 export function generateTriggerMessage(workerName: string): string {
   return `Read and follow the instructions in .ultraagent/team/inbox/${workerName}.md`;

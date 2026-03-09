@@ -55,7 +55,6 @@ describe("mcp-comm", () => {
     throw new Error("connection refused");
   };
 
-  // ── queueInboxInstruction ─────────────────────────────────────────
 
   describe("queueInboxInstruction", () => {
     it("writes inbox file and enqueues dispatch", async () => {
@@ -123,7 +122,6 @@ describe("mcp-comm", () => {
     });
   });
 
-  // ── queueDirectMailboxMessage ─────────────────────────────────────
 
   describe("queueDirectMailboxMessage", () => {
     it("sends message and enqueues dispatch on success", async () => {
@@ -193,7 +191,6 @@ describe("mcp-comm", () => {
     });
   });
 
-  // ── queueBroadcastMailboxMessage ──────────────────────────────────
 
   describe("queueBroadcastMailboxMessage", () => {
     it("broadcasts to all recipients and creates dispatch per worker", async () => {
@@ -222,7 +219,6 @@ describe("mcp-comm", () => {
     });
   });
 
-  // ── waitForDispatchReceipt ────────────────────────────────────────
 
   describe("waitForDispatchReceipt", () => {
     it("returns immediately for already-notified request", async () => {

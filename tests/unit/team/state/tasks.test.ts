@@ -27,7 +27,6 @@ describe("tasks", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  // ── Create ─────────────────────────────────────────────────────────
 
   describe("createTeamTask", () => {
     it("creates a task with auto-increment ID starting at 1", async () => {
@@ -77,7 +76,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── Read ───────────────────────────────────────────────────────────
 
   describe("readTask", () => {
     it("returns null for non-existent task", async () => {
@@ -97,7 +95,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── Claim ──────────────────────────────────────────────────────────
 
   describe("claimTask", () => {
     it("claims a pending task successfully", async () => {
@@ -152,7 +149,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── Transition ─────────────────────────────────────────────────────
 
   describe("transitionTask", () => {
     it("transitions in_progress → completed", async () => {
@@ -258,7 +254,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── Release claim ──────────────────────────────────────────────────
 
   describe("releaseTaskClaim", () => {
     it("releases a claimed task back to pending", async () => {
@@ -291,7 +286,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── Readiness ──────────────────────────────────────────────────────
 
   describe("computeTaskReadiness", () => {
     it("returns ready for task without dependencies", async () => {
@@ -348,7 +342,6 @@ describe("tasks", () => {
     });
   });
 
-  // ── List ───────────────────────────────────────────────────────────
 
   describe("listTeamTasks", () => {
     it("returns empty array when no tasks exist", async () => {

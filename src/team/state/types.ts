@@ -5,8 +5,6 @@
 
 import type { ApprovalStatus, EventType, TaskStatus } from "../contracts.js";
 
-// ── Task types ─────────────────────────────────────────────────────────
-
 export interface TeamTask {
   id: string;
   subject: string;
@@ -30,8 +28,6 @@ export interface TaskClaim {
   token: string;
   leased_until: string;
 }
-
-// ── Task operation results ─────────────────────────────────────────────
 
 export type TaskReadiness =
   | { ready: true }
@@ -73,8 +69,6 @@ export type ReleaseTaskClaimResult =
         | "lease_expired";
     };
 
-// ── Worker types ───────────────────────────────────────────────────────
-
 export type WorkerState =
   | "idle"
   | "working"
@@ -98,8 +92,6 @@ export interface WorkerHeartbeat {
   alive: boolean;
 }
 
-// ── Event types ────────────────────────────────────────────────────────
-
 export interface TeamEvent {
   event_id: string;
   type: EventType;
@@ -113,8 +105,6 @@ export interface TeamEvent {
   created_at: string;
 }
 
-// ── Mailbox types (Phase 2) ────────────────────────────────────────────
-
 export interface MailboxMessage {
   message_id: string;
   from_worker: string;
@@ -125,14 +115,10 @@ export interface MailboxMessage {
   delivered_at?: string;
 }
 
-// ── Mailbox aggregate ─────────────────────────────────────────────────
-
 export interface TeamMailbox {
   worker: string;
   messages: MailboxMessage[];
 }
-
-// ── Dispatch types (Phase 2) ──────────────────────────────────────────
 
 export type DispatchRequestKind = "inbox" | "mailbox" | "nudge";
 export type DispatchRequestStatus =
@@ -179,8 +165,6 @@ export interface DispatchRequestInput {
   last_reason?: string;
 }
 
-// ── Dispatch transport & outcome ──────────────────────────────────────
-
 export type DispatchTransport =
   | "hook"
   | "prompt_stdin"
@@ -197,8 +181,6 @@ export interface DispatchOutcome {
   to_worker?: string;
 }
 
-// ── Approval types ─────────────────────────────────────────────────────
-
 export interface TaskApprovalRecord {
   task_id: string;
   required: boolean;
@@ -208,8 +190,6 @@ export interface TaskApprovalRecord {
   decided_at: string;
 }
 
-// ── Monitor snapshot (Phase 6) ─────────────────────────────────────────
-
 export interface MonitorSnapshot {
   taskStatusById: Record<string, string>;
   workerAliveByName: Record<string, boolean>;
@@ -218,8 +198,6 @@ export interface MonitorSnapshot {
   workerTaskIdByName: Record<string, string>;
   completedEventTaskIds: Record<string, boolean>;
 }
-
-// ── Task input (for creating tasks) ────────────────────────────────────
 
 export interface CreateTaskInput {
   subject: string;

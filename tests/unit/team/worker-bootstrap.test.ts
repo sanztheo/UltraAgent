@@ -25,7 +25,6 @@ describe("worker-bootstrap", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  // ── Overlay generation ────────────────────────────────────────────
 
   describe("generateWorkerOverlay", () => {
     it("includes START and END markers", () => {
@@ -42,7 +41,6 @@ describe("worker-bootstrap", () => {
     });
   });
 
-  // ── Overlay application ───────────────────────────────────────────
 
   describe("applyWorkerOverlay / stripWorkerOverlay", () => {
     it("applies overlay to new file", async () => {
@@ -100,7 +98,6 @@ describe("worker-bootstrap", () => {
     });
   });
 
-  // ── Inbox generation ──────────────────────────────────────────────
 
   describe("generateInitialInbox", () => {
     const tasks: TeamTask[] = [
@@ -179,7 +176,6 @@ describe("worker-bootstrap", () => {
     });
   });
 
-  // ── Trigger messages ──────────────────────────────────────────────
 
   describe("generateTriggerMessage", () => {
     it("is short and references inbox path", () => {

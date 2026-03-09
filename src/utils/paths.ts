@@ -36,8 +36,6 @@ export function scriptsDir(): string {
   return join(globalConfigDir(), "scripts");
 }
 
-// ── Team state paths ───────────────────────────────────────────────────
-
 export function teamDir(cwd: string): string {
   return join(stateDir(cwd), "team");
 }

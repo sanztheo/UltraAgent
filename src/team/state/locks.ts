@@ -149,8 +149,6 @@ export async function tryLock<T>(
   }
 }
 
-// ── Convenience wrappers ───────────────────────────────────────────────
-
 const LOCK_OPTS: LockOptions = {
   staleMs: DEFAULT_STALE_MS,
   timeoutMs: DEFAULT_TIMEOUT_MS,

@@ -28,8 +28,6 @@ import type {
 
 const LEASE_DURATION_MS = 15 * 60 * 1000;
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
 function taskFilePath(tasksDir: string, taskId: string): string {
   return join(tasksDir, `task-${taskId}.json`);
 }
@@ -53,8 +51,6 @@ export async function readTask(tasksDir: string, taskId: string): Promise<TeamTa
   }
 }
 
-// ── Task readiness (dependency check) ──────────────────────────────────
-
 export async function computeTaskReadiness(tasksDir: string, taskId: string): Promise<TaskReadiness> {
   const task = await readTask(tasksDir, taskId);
   if (!task) {
@@ -76,8 +72,6 @@ export async function computeTaskReadiness(tasksDir: string, taskId: string): Pr
   }
   return { ready: true };
 }
-
-// ── Create task ────────────────────────────────────────────────────────
 
 export async function createTeamTask(teamDir: string, tasksDir: string, input: CreateTaskInput): Promise<TeamTask> {
   return withTeamLock(teamDir, async () => {
@@ -114,8 +108,6 @@ export async function createTeamTask(teamDir: string, tasksDir: string, input: C
     return task;
   });
 }
-
-// ── Claim task ─────────────────────────────────────────────────────────
 
 export async function claimTask(tasksDir: string, taskId: string, workerName: string): Promise<ClaimTaskResult> {
   const existing = await readTask(tasksDir, taskId);
@@ -179,8 +171,6 @@ export async function claimTask(tasksDir: string, taskId: string, workerName: st
   return lock.value;
 }
 
-// ── Transition task status ─────────────────────────────────────────────
-
 export async function transitionTask(
   tasksDir: string,
   taskId: string,
@@ -233,8 +223,6 @@ export async function transitionTask(
   return lock.value;
 }
 
-// ── Release claim (give task back to pending) ──────────────────────────
-
 export async function releaseTaskClaim(
   tasksDir: string,
   taskId: string,
@@ -280,8 +268,6 @@ export async function releaseTaskClaim(
   if (!lock.ok) return { ok: false, error: 'claim_conflict' };
   return lock.value;
 }
-
-// ── List tasks ─────────────────────────────────────────────────────────
 
 export async function listTeamTasks(tasksDir: string): Promise<TeamTask[]> {
   if (!existsSync(tasksDir)) return [];

@@ -13,8 +13,6 @@ import { safeReadJsonFile } from "../../utils/safe-json.js";
 import { writeAtomic } from "./io.js";
 import type { WorkerHeartbeat, WorkerState, WorkerStatus } from "./types.js";
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
 function statusPath(workersDir: string, workerName: string): string {
   return join(workersDir, workerName, "status.json");
 }
@@ -34,8 +32,6 @@ function isWorkerHeartbeat(value: unknown): value is WorkerHeartbeat {
   const obj = value as Record<string, unknown>;
   return typeof obj.pid === "number" && typeof obj.alive === "boolean";
 }
-
-// ── Status ─────────────────────────────────────────────────────────────
 
 export async function readWorkerStatus(
   workersDir: string,
@@ -67,8 +63,6 @@ export async function writeWorkerStatus(
   );
   return status;
 }
-
-// ── Heartbeat ──────────────────────────────────────────────────────────
 
 export async function readWorkerHeartbeat(
   workersDir: string,
@@ -108,8 +102,6 @@ export async function updateWorkerHeartbeat(
   return heartbeat;
 }
 
-// ── Dead worker detection ──────────────────────────────────────────────
-
 const DEFAULT_HEARTBEAT_STALE_MS = 5 * 60 * 1000;
 
 export async function isWorkerAlive(
@@ -123,8 +115,6 @@ export async function isWorkerAlive(
   const elapsed = Date.now() - new Date(hb.last_turn_at).getTime();
   return elapsed < staleMs;
 }
-
-// ── List workers ───────────────────────────────────────────────────────
 
 export async function listWorkers(workersDir: string): Promise<string[]> {
   if (!existsSync(workersDir)) return [];

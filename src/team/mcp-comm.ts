@@ -34,8 +34,6 @@ import type {
   DispatchTransport,
 } from "./state/types.js";
 
-// ── Notifier contract ──────────────────────────────────────────────────
-
 export interface NotifierTarget {
   workerName: string;
   workerIndex?: number;
@@ -47,8 +45,6 @@ export type TeamNotifier = (
   message: string,
   context: { request: DispatchRequest; message_id?: string },
 ) => DispatchOutcome | Promise<DispatchOutcome>;
-
-// ── Internal helpers ───────────────────────────────────────────────────
 
 function isConfirmedNotification(outcome: DispatchOutcome): boolean {
   if (!outcome.ok) return false;
@@ -122,8 +118,6 @@ async function writeWorkerInbox(
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, content, "utf-8");
 }
-
-// ── Queue inbox instruction ────────────────────────────────────────────
 
 export interface QueueInboxParams {
   dispatchDir: string;
@@ -199,8 +193,6 @@ export async function queueInboxInstruction(
 
   return outcome;
 }
-
-// ── Queue direct mailbox message ───────────────────────────────────────
 
 export interface QueueDirectMessageParams {
   mailboxDir: string;
@@ -291,8 +283,6 @@ export async function queueDirectMailboxMessage(
 
   return outcome;
 }
-
-// ── Queue broadcast ────────────────────────────────────────────────────
 
 export interface QueueBroadcastParams {
   mailboxDir: string;
@@ -398,8 +388,6 @@ export async function queueBroadcastMailboxMessage(
 
   return outcomes;
 }
-
-// ── Wait for dispatch receipt ──────────────────────────────────────────
 
 export async function waitForDispatchReceipt(
   dispatchDir: string,

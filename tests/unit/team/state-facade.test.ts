@@ -29,7 +29,6 @@ describe("state facade", () => {
     await rm(fakeCwd, { recursive: true, force: true });
   });
 
-  // ── Validation ───────────────────────────────────────────────────
 
   describe("validateTaskId", () => {
     it("accepts valid IDs", () => {
@@ -73,7 +72,6 @@ describe("state facade", () => {
     });
   });
 
-  // ── Task CRUD via facade ─────────────────────────────────────────
 
   describe("task operations", () => {
     it("create → get → list round-trip", async () => {
@@ -125,7 +123,6 @@ describe("state facade", () => {
     });
   });
 
-  // ── Approvals via facade ─────────────────────────────────────────
 
   describe("approval operations", () => {
     it("set → get round-trip", async () => {

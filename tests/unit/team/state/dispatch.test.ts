@@ -25,7 +25,6 @@ describe("dispatch", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  // ── normalizeDispatchRequest ───────────────────────────────────────
 
   describe("normalizeDispatchRequest", () => {
     it("normalizes a valid partial request", () => {
@@ -71,7 +70,6 @@ describe("dispatch", () => {
     });
   });
 
-  // ── enqueueDispatchRequest ────────────────────────────────────────
 
   describe("enqueueDispatchRequest", () => {
     it("enqueues a new request", async () => {
@@ -148,7 +146,6 @@ describe("dispatch", () => {
     });
   });
 
-  // ── readDispatchRequest ───────────────────────────────────────────
 
   describe("readDispatchRequest", () => {
     it("returns null for non-existent request", async () => {
@@ -169,7 +166,6 @@ describe("dispatch", () => {
     });
   });
 
-  // ── listDispatchRequests ──────────────────────────────────────────
 
   describe("listDispatchRequests", () => {
     it("returns empty array when no requests", async () => {
@@ -239,7 +235,6 @@ describe("dispatch", () => {
     });
   });
 
-  // ── transitionDispatchRequest ─────────────────────────────────────
 
   describe("transitionDispatchRequest", () => {
     it("transitions pending -> notified", async () => {
@@ -315,7 +310,6 @@ describe("dispatch", () => {
     });
   });
 
-  // ── Convenience: markNotified / markDelivered ─────────────────────
 
   describe("markDispatchRequestNotified", () => {
     it("marks a pending request as notified", async () => {

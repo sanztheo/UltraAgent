@@ -27,7 +27,6 @@ describe("workers", () => {
     await rm(workersDir, { recursive: true, force: true });
   });
 
-  // ── Status ────────────────────────────────────────────────────────
 
   describe("writeWorkerStatus / readWorkerStatus", () => {
     it("writes and reads status", async () => {
@@ -72,7 +71,6 @@ describe("workers", () => {
     });
   });
 
-  // ── Heartbeat ─────────────────────────────────────────────────────
 
   describe("writeWorkerHeartbeat / readWorkerHeartbeat", () => {
     it("writes and reads heartbeat", async () => {
@@ -126,7 +124,6 @@ describe("workers", () => {
     });
   });
 
-  // ── Dead worker detection ─────────────────────────────────────────
 
   describe("isWorkerAlive", () => {
     it("returns false for non-existent worker", async () => {
@@ -167,7 +164,6 @@ describe("workers", () => {
     });
   });
 
-  // ── List workers ──────────────────────────────────────────────────
 
   describe("listWorkers", () => {
     it("returns empty array for non-existent dir", async () => {

@@ -19,8 +19,6 @@ import type {
   DispatchRequestStatus,
 } from "./types.js";
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
 function requestsFilePath(dispatchDir: string): string {
   return join(dispatchDir, "requests.json");
 }
@@ -81,8 +79,6 @@ function equivalentPendingDispatch(
   }
   return existing.trigger_message === input.trigger_message;
 }
-
-// ── Normalize ──────────────────────────────────────────────────────────
 
 export function normalizeDispatchRequest(
   raw: Partial<DispatchRequest>,
@@ -158,8 +154,6 @@ export function normalizeDispatchRequest(
   };
 }
 
-// ── Enqueue ────────────────────────────────────────────────────────────
-
 export async function enqueueDispatchRequest(
   dispatchDir: string,
   input: DispatchRequestInput,
@@ -201,8 +195,6 @@ export async function enqueueDispatchRequest(
   });
 }
 
-// ── Read & list ────────────────────────────────────────────────────────
-
 export async function readDispatchRequest(
   dispatchDir: string,
   requestId: string,
@@ -231,8 +223,6 @@ export async function listDispatchRequests(
     filtered = filtered.slice(0, opts.limit);
   return filtered;
 }
-
-// ── Transition ─────────────────────────────────────────────────────────
 
 export async function transitionDispatchRequest(
   dispatchDir: string,
@@ -276,8 +266,6 @@ export async function transitionDispatchRequest(
     return next;
   });
 }
-
-// ── Convenience transitions ────────────────────────────────────────────
 
 export async function markDispatchRequestNotified(
   dispatchDir: string,

@@ -23,7 +23,6 @@ describe("mailbox", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  // ── sendDirectMessage ──────────────────────────────────────────────
 
   describe("sendDirectMessage", () => {
     it("creates a message with a UUID and timestamps", async () => {
@@ -70,7 +69,6 @@ describe("mailbox", () => {
     });
   });
 
-  // ── broadcastMessage ───────────────────────────────────────────────
 
   describe("broadcastMessage", () => {
     it("sends to all workers except the sender", async () => {
@@ -110,7 +108,6 @@ describe("mailbox", () => {
     });
   });
 
-  // ── markMessageDelivered ──────────────────────────────────────────
 
   describe("markMessageDelivered", () => {
     it("sets delivered_at on an existing message", async () => {
@@ -160,7 +157,6 @@ describe("mailbox", () => {
     });
   });
 
-  // ── markMessageNotified ───────────────────────────────────────────
 
   describe("markMessageNotified", () => {
     it("sets notified_at on an existing message", async () => {
@@ -183,7 +179,6 @@ describe("mailbox", () => {
     });
   });
 
-  // ── listMailboxMessages ───────────────────────────────────────────
 
   describe("listMailboxMessages", () => {
     it("returns empty array for worker with no mailbox", async () => {

@@ -5,11 +5,7 @@
  * This file preserves the single-import contract:
  *   import { getTask, sendMessage, ... } from "./state.js"
  */
-
-// ── Facade operations ───────────────────────────────────────────────
 export * from "./facade/index.js";
-
-// ── Type re-exports for convenience ─────────────────────────────────
 export type {
   ClaimTaskResult,
   CreateTaskInput,

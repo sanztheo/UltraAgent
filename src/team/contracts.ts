@@ -3,8 +3,6 @@
  * All team modules depend on these; this file has zero internal imports.
  */
 
-// ── Task statuses ──────────────────────────────────────────────────────
-
 export const TASK_STATUSES = ['pending', 'blocked', 'in_progress', 'completed', 'failed'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -27,8 +25,6 @@ export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
   return TASK_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-// ── Event types ────────────────────────────────────────────────────────
-
 export const EVENT_TYPES = [
   'task_completed',
   'task_failed',
@@ -43,12 +39,8 @@ export const EVENT_TYPES = [
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
-// ── Approval statuses ──────────────────────────────────────────────────
-
 export const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
-
-// ── Validation patterns ────────────────────────────────────────────────
 
 export const TASK_ID_PATTERN = /^\d{1,20}$/;
 export const WORKER_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;

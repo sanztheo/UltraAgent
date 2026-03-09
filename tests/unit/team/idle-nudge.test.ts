@@ -35,7 +35,6 @@ describe("NudgeTracker", () => {
     };
   }
 
-  // ── Basic evaluation ──────────────────────────────────────────────
 
   describe("evaluate", () => {
     it("returns no_status when worker has no status", () => {
@@ -109,7 +108,6 @@ describe("NudgeTracker", () => {
     });
   });
 
-  // ── Cooldown ──────────────────────────────────────────────────────
 
   describe("cooldown", () => {
     it("respects cooldown after nudge", () => {
@@ -142,7 +140,6 @@ describe("NudgeTracker", () => {
     });
   });
 
-  // ── Backoff ───────────────────────────────────────────────────────
 
   describe("backoff", () => {
     it("applies exponential backoff on repeated nudges", () => {
@@ -164,7 +161,6 @@ describe("NudgeTracker", () => {
     });
   });
 
-  // ── Max nudge cap ─────────────────────────────────────────────────
 
   describe("max nudge cap", () => {
     it("stops nudging after max attempts", () => {
@@ -188,7 +184,6 @@ describe("NudgeTracker", () => {
     });
   });
 
-  // ── Reset ─────────────────────────────────────────────────────────
 
   describe("reset", () => {
     it("clears nudge record for a worker", () => {
@@ -228,7 +223,6 @@ describe("NudgeTracker", () => {
     });
   });
 
-  // ── Diagnostics ───────────────────────────────────────────────────
 
   describe("diagnostics", () => {
     it("getRecord returns undefined for unknown worker", () => {
