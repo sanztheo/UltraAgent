@@ -8,9 +8,9 @@
  * based on mtime.
  */
 
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 const DEFAULT_STALE_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -31,7 +31,10 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function recoverStaleLock(lockDir: string, staleMs: number): Promise<boolean> {
+async function recoverStaleLock(
+  lockDir: string,
+  staleMs: number,
+): Promise<boolean> {
   try {
     const info = await stat(lockDir);
     if (Date.now() - info.mtimeMs > staleMs) {
@@ -48,10 +51,14 @@ async function recoverStaleLock(lockDir: string, staleMs: number): Promise<boole
  * Acquire a directory-based lock, execute `fn`, then release.
  * Throws if the lock cannot be acquired within `timeoutMs`.
  */
-export async function withLock<T>(lockDir: string, options: LockOptions, fn: () => Promise<T>): Promise<T> {
+export async function withLock<T>(
+  lockDir: string,
+  options: LockOptions,
+  fn: () => Promise<T>,
+): Promise<T> {
   const staleMs = options.staleMs ?? DEFAULT_STALE_MS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const ownerPath = join(lockDir, 'owner');
+  const ownerPath = join(lockDir, "owner");
   const token = ownerToken();
   const deadline = Date.now() + timeoutMs;
 
@@ -61,7 +68,7 @@ export async function withLock<T>(lockDir: string, options: LockOptions, fn: () 
     try {
       await mkdir(lockDir);
       try {
-        await writeFile(ownerPath, token, 'utf-8');
+        await writeFile(ownerPath, token, "utf-8");
       } catch (error) {
         await rm(lockDir, { recursive: true, force: true });
         throw error;
@@ -69,7 +76,7 @@ export async function withLock<T>(lockDir: string, options: LockOptions, fn: () 
       break;
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'EEXIST') throw error;
+      if (err.code !== "EEXIST") throw error;
       if (await recoverStaleLock(lockDir, staleMs)) continue;
       if (Date.now() > deadline) {
         throw new Error(`Lock timeout: ${lockDir}`);
@@ -82,7 +89,7 @@ export async function withLock<T>(lockDir: string, options: LockOptions, fn: () 
     return await fn();
   } finally {
     try {
-      const currentOwner = await readFile(ownerPath, 'utf-8');
+      const currentOwner = await readFile(ownerPath, "utf-8");
       if (currentOwner.trim() === token) {
         await rm(lockDir, { recursive: true, force: true });
       }
@@ -103,7 +110,7 @@ export async function tryLock<T>(
 ): Promise<{ ok: true; value: T } | { ok: false }> {
   const staleMs = options.staleMs ?? DEFAULT_STALE_MS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const ownerPath = join(lockDir, 'owner');
+  const ownerPath = join(lockDir, "owner");
   const token = ownerToken();
   const deadline = Date.now() + timeoutMs;
 
@@ -115,7 +122,7 @@ export async function tryLock<T>(
       break;
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'EEXIST') throw error;
+      if (err.code !== "EEXIST") throw error;
       if (await recoverStaleLock(lockDir, staleMs)) continue;
       if (Date.now() > deadline) return { ok: false };
       await sleep(RETRY_MS);
@@ -124,7 +131,7 @@ export async function tryLock<T>(
 
   try {
     try {
-      await writeFile(ownerPath, token, 'utf-8');
+      await writeFile(ownerPath, token, "utf-8");
     } catch (error) {
       await rm(lockDir, { recursive: true, force: true });
       throw error;
@@ -132,7 +139,7 @@ export async function tryLock<T>(
     return { ok: true, value: await fn() };
   } finally {
     try {
-      const currentOwner = await readFile(ownerPath, 'utf-8');
+      const currentOwner = await readFile(ownerPath, "utf-8");
       if (currentOwner.trim() === token) {
         await rm(lockDir, { recursive: true, force: true });
       }
@@ -149,8 +156,11 @@ const LOCK_OPTS: LockOptions = {
   timeoutMs: DEFAULT_TIMEOUT_MS,
 };
 
-export async function withTeamLock<T>(teamDir: string, fn: () => Promise<T>): Promise<T> {
-  return withLock(join(teamDir, '.lock.create-task'), LOCK_OPTS, fn);
+export async function withTeamLock<T>(
+  teamDir: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withLock(join(teamDir, ".lock.create-task"), LOCK_OPTS, fn);
 }
 
 export async function withTaskClaimLock<T>(
@@ -161,13 +171,35 @@ export async function withTaskClaimLock<T>(
   return tryLock(join(tasksDir, `.lock.claim-${taskId}`), LOCK_OPTS, fn);
 }
 
-export async function withMailboxLock<T>(mailboxDir: string, workerName: string, fn: () => Promise<T>): Promise<T> {
+export async function withMailboxLock<T>(
+  mailboxDir: string,
+  workerName: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   if (!existsSync(mailboxDir)) {
     throw new Error(`Mailbox directory not found: ${mailboxDir}`);
   }
   return withLock(join(mailboxDir, `.lock.${workerName}`), LOCK_OPTS, fn);
 }
 
-export async function withScalingLock<T>(teamDir: string, fn: () => Promise<T>): Promise<T> {
-  return withLock(join(teamDir, '.lock.scaling'), { staleMs: DEFAULT_STALE_MS, timeoutMs: 10_000 }, fn);
+export async function withScalingLock<T>(
+  teamDir: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withLock(
+    join(teamDir, ".lock.scaling"),
+    { staleMs: DEFAULT_STALE_MS, timeoutMs: 10_000 },
+    fn,
+  );
+}
+
+export async function withDispatchLock<T>(
+  dispatchDir: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withLock(
+    join(dispatchDir, ".lock.dispatch"),
+    { staleMs: 5 * 60 * 1000, timeoutMs: 15_000 },
+    fn,
+  );
 }

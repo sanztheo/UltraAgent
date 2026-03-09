@@ -8,12 +8,33 @@
  * This facade just wires cwd → paths → operations.
  */
 
-import { resolve, sep } from 'node:path';
+import { resolve, sep } from "node:path";
 
-import { teamApprovalsDir, teamDir, teamEventsDir, teamMailboxDir, teamTasksDir } from '../utils/paths.js';
-import { TASK_ID_PATTERN, WORKER_NAME_PATTERN } from './contracts.js';
-import { readTaskApproval, writeTaskApproval } from './state/approvals.js';
-import { withTeamLock } from './state/locks.js';
+import {
+  teamApprovalsDir,
+  teamDir,
+  teamDispatchDir,
+  teamEventsDir,
+  teamMailboxDir,
+  teamTasksDir,
+} from "../utils/paths.js";
+import { TASK_ID_PATTERN, WORKER_NAME_PATTERN } from "./contracts.js";
+import { readTaskApproval, writeTaskApproval } from "./state/approvals.js";
+import {
+  enqueueDispatchRequest,
+  listDispatchRequests,
+  markDispatchRequestDelivered,
+  markDispatchRequestNotified,
+  readDispatchRequest,
+} from "./state/dispatch.js";
+import { withTeamLock } from "./state/locks.js";
+import {
+  broadcastMessage,
+  listMailboxMessages,
+  markMessageDelivered,
+  markMessageNotified,
+  sendDirectMessage,
+} from "./state/mailbox.js";
 import {
   claimTask,
   computeTaskReadiness,
@@ -22,16 +43,21 @@ import {
   readTask,
   releaseTaskClaim,
   transitionTask,
-} from './state/tasks.js';
+} from "./state/tasks.js";
 import type {
   ClaimTaskResult,
   CreateTaskInput,
+  DispatchRequest,
+  DispatchRequestInput,
+  DispatchRequestKind,
+  DispatchRequestStatus,
+  MailboxMessage,
   ReleaseTaskClaimResult,
   TaskApprovalRecord,
   TaskReadiness,
   TeamTask,
   TransitionTaskResult,
-} from './state/types.js';
+} from "./state/types.js";
 
 // ── Re-exports for convenience ───────────────────────────────────────
 
@@ -50,48 +76,79 @@ export type {
   WorkerStatus,
   WorkerHeartbeat,
   TeamEvent,
-} from './state/types.js';
-export type { MailboxMessage, MonitorSnapshot } from './state/types.js';
+} from "./state/types.js";
+export type { MailboxMessage, MonitorSnapshot } from "./state/types.js";
+export type {
+  DispatchRequest,
+  DispatchRequestInput,
+  DispatchRequestKind,
+  DispatchRequestStatus,
+  DispatchOutcome,
+  DispatchTransport,
+  TeamMailbox,
+} from "./state/types.js";
 
 // ── Validation ───────────────────────────────────────────────────────
 
 export function validateTaskId(taskId: string): void {
   if (!TASK_ID_PATTERN.test(taskId)) {
-    throw new Error(`Invalid task ID: "${taskId}". Must be a positive integer (digits only, max 20 digits).`);
+    throw new Error(
+      `Invalid task ID: "${taskId}". Must be a positive integer (digits only, max 20 digits).`,
+    );
   }
 }
 
 export function validateWorkerName(name: string): void {
   if (!WORKER_NAME_PATTERN.test(name)) {
-    throw new Error(`Invalid worker name: "${name}". Must match /^[a-z0-9][a-z0-9-]{0,63}$/.`);
+    throw new Error(
+      `Invalid worker name: "${name}". Must match /^[a-z0-9][a-z0-9-]{0,63}$/.`,
+    );
   }
 }
 
 export function assertPathWithinDir(filePath: string, rootDir: string): void {
   const normalizedRoot = resolve(rootDir);
   const normalizedPath = resolve(filePath);
-  if (normalizedPath !== normalizedRoot && !normalizedPath.startsWith(normalizedRoot + sep)) {
-    throw new Error('Path traversal detected: path is outside the allowed directory');
+  if (
+    normalizedPath !== normalizedRoot &&
+    !normalizedPath.startsWith(normalizedRoot + sep)
+  ) {
+    throw new Error(
+      "Path traversal detected: path is outside the allowed directory",
+    );
   }
 }
 
 // ── Facade: task operations bound to cwd ─────────────────────────────
 
-export async function getTask(cwd: string, taskId: string): Promise<TeamTask | null> {
+export async function getTask(
+  cwd: string,
+  taskId: string,
+): Promise<TeamTask | null> {
   validateTaskId(taskId);
   return readTask(teamTasksDir(cwd), taskId);
 }
 
-export async function getTaskReadiness(cwd: string, taskId: string): Promise<TaskReadiness> {
+export async function getTaskReadiness(
+  cwd: string,
+  taskId: string,
+): Promise<TaskReadiness> {
   validateTaskId(taskId);
   return computeTaskReadiness(teamTasksDir(cwd), taskId);
 }
 
-export async function createTask(cwd: string, input: CreateTaskInput): Promise<TeamTask> {
+export async function createTask(
+  cwd: string,
+  input: CreateTaskInput,
+): Promise<TeamTask> {
   return createTeamTask(teamDir(cwd), teamTasksDir(cwd), input);
 }
 
-export async function claim(cwd: string, taskId: string, workerName: string): Promise<ClaimTaskResult> {
+export async function claim(
+  cwd: string,
+  taskId: string,
+  workerName: string,
+): Promise<ClaimTaskResult> {
   validateTaskId(taskId);
   validateWorkerName(workerName);
   return claimTask(teamTasksDir(cwd), taskId, workerName);
@@ -100,15 +157,19 @@ export async function claim(cwd: string, taskId: string, workerName: string): Pr
 export async function transition(
   cwd: string,
   taskId: string,
-  from: import('./contracts.js').TaskStatus,
-  to: import('./contracts.js').TaskStatus,
+  from: import("./contracts.js").TaskStatus,
+  to: import("./contracts.js").TaskStatus,
   claimToken: string,
 ): Promise<TransitionTaskResult> {
   validateTaskId(taskId);
   return transitionTask(teamTasksDir(cwd), taskId, from, to, claimToken);
 }
 
-export async function releaseClaim(cwd: string, taskId: string, claimToken: string): Promise<ReleaseTaskClaimResult> {
+export async function releaseClaim(
+  cwd: string,
+  taskId: string,
+  claimToken: string,
+): Promise<ReleaseTaskClaimResult> {
   validateTaskId(taskId);
   return releaseTaskClaim(teamTasksDir(cwd), taskId, claimToken);
 }
@@ -119,19 +180,122 @@ export async function listTasks(cwd: string): Promise<TeamTask[]> {
 
 // ── Facade: approvals ────────────────────────────────────────────────
 
-export async function getApproval(cwd: string, taskId: string): Promise<TaskApprovalRecord | null> {
+export async function getApproval(
+  cwd: string,
+  taskId: string,
+): Promise<TaskApprovalRecord | null> {
   validateTaskId(taskId);
   return readTaskApproval(teamApprovalsDir(cwd), taskId);
 }
 
-export async function setApproval(cwd: string, approval: TaskApprovalRecord): Promise<void> {
+export async function setApproval(
+  cwd: string,
+  approval: TaskApprovalRecord,
+): Promise<void> {
   validateTaskId(approval.task_id);
   return writeTaskApproval(teamApprovalsDir(cwd), approval);
 }
 
+// ── Facade: mailbox ──────────────────────────────────────────────────
+
+export async function sendMessage(
+  cwd: string,
+  fromWorker: string,
+  toWorker: string,
+  body: string,
+): Promise<MailboxMessage> {
+  validateWorkerName(fromWorker);
+  validateWorkerName(toWorker);
+  return sendDirectMessage(teamMailboxDir(cwd), fromWorker, toWorker, body);
+}
+
+export async function broadcast(
+  cwd: string,
+  fromWorker: string,
+  body: string,
+  workerNames: string[],
+): Promise<MailboxMessage[]> {
+  validateWorkerName(fromWorker);
+  for (const name of workerNames) validateWorkerName(name);
+  return broadcastMessage(teamMailboxDir(cwd), fromWorker, body, workerNames);
+}
+
+export async function getMessages(
+  cwd: string,
+  workerName: string,
+): Promise<MailboxMessage[]> {
+  validateWorkerName(workerName);
+  return listMailboxMessages(teamMailboxDir(cwd), workerName);
+}
+
+export async function markDelivered(
+  cwd: string,
+  workerName: string,
+  messageId: string,
+): Promise<boolean> {
+  validateWorkerName(workerName);
+  return markMessageDelivered(teamMailboxDir(cwd), workerName, messageId);
+}
+
+export async function markNotified(
+  cwd: string,
+  workerName: string,
+  messageId: string,
+): Promise<boolean> {
+  validateWorkerName(workerName);
+  return markMessageNotified(teamMailboxDir(cwd), workerName, messageId);
+}
+
+// ── Facade: dispatch ────────────────────────────────────────────────
+
+export async function enqueueDispatch(
+  cwd: string,
+  input: DispatchRequestInput,
+): Promise<{ request: DispatchRequest; deduped: boolean }> {
+  return enqueueDispatchRequest(teamDispatchDir(cwd), input);
+}
+
+export async function getDispatch(
+  cwd: string,
+  requestId: string,
+): Promise<DispatchRequest | null> {
+  return readDispatchRequest(teamDispatchDir(cwd), requestId);
+}
+
+export async function listDispatches(
+  cwd: string,
+  opts?: {
+    status?: DispatchRequestStatus;
+    kind?: DispatchRequestKind;
+    to_worker?: string;
+    limit?: number;
+  },
+): Promise<DispatchRequest[]> {
+  return listDispatchRequests(teamDispatchDir(cwd), opts);
+}
+
+export async function markDispatchNotified(
+  cwd: string,
+  requestId: string,
+  patch?: Partial<DispatchRequest>,
+): Promise<DispatchRequest | null> {
+  return markDispatchRequestNotified(teamDispatchDir(cwd), requestId, patch);
+}
+
+export async function markDispatchDelivered(
+  cwd: string,
+  requestId: string,
+  patch?: Partial<DispatchRequest>,
+): Promise<DispatchRequest | null> {
+  return markDispatchRequestDelivered(teamDispatchDir(cwd), requestId, patch);
+}
+
 // ── Facade: team lock ────────────────────────────────────────────────
 
-export async function withLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+export async function withLock<T>(
+  cwd: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   return withTeamLock(teamDir(cwd), fn);
 }
 
@@ -155,4 +319,8 @@ export function resolveMailboxDir(cwd: string): string {
 
 export function resolveEventsDir(cwd: string): string {
   return teamEventsDir(cwd);
+}
+
+export function resolveDispatchDir(cwd: string): string {
+  return teamDispatchDir(cwd);
 }

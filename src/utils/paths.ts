@@ -1,63 +1,71 @@
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
 export function expandHome(filepath: string): string {
-  if (filepath.startsWith('~/')) {
+  if (filepath.startsWith("~/")) {
     return join(homedir(), filepath.slice(2));
   }
   return filepath;
 }
 
 export function globalConfigDir(): string {
-  return join(homedir(), '.ultraagent');
+  return join(homedir(), ".ultraagent");
 }
 
 export function globalConfigPath(): string {
-  return join(globalConfigDir(), 'config.json');
+  return join(globalConfigDir(), "config.json");
 }
 
 export function projectConfigPath(cwd: string): string {
-  return join(resolve(cwd), '.ultraagent.json');
+  return join(resolve(cwd), ".ultraagent.json");
 }
 
 export function stateDir(cwd: string): string {
-  return join(resolve(cwd), '.ultraagent');
+  return join(resolve(cwd), ".ultraagent");
 }
 
 export function statePath(cwd: string): string {
-  return join(stateDir(cwd), 'state.json');
+  return join(stateDir(cwd), "state.json");
 }
 
 export function tasksDir(cwd: string): string {
-  return join(stateDir(cwd), 'tasks');
+  return join(stateDir(cwd), "tasks");
 }
 
 export function scriptsDir(): string {
-  return join(globalConfigDir(), 'scripts');
+  return join(globalConfigDir(), "scripts");
 }
 
 // ── Team state paths ───────────────────────────────────────────────────
 
 export function teamDir(cwd: string): string {
-  return join(stateDir(cwd), 'team');
+  return join(stateDir(cwd), "team");
 }
 
 export function teamTasksDir(cwd: string): string {
-  return join(teamDir(cwd), 'tasks');
+  return join(teamDir(cwd), "tasks");
 }
 
 export function teamApprovalsDir(cwd: string): string {
-  return join(teamDir(cwd), 'approvals');
+  return join(teamDir(cwd), "approvals");
 }
 
 export function teamMailboxDir(cwd: string): string {
-  return join(teamDir(cwd), 'mailbox');
+  return join(teamDir(cwd), "mailbox");
 }
 
 export function teamEventsDir(cwd: string): string {
-  return join(teamDir(cwd), 'events');
+  return join(teamDir(cwd), "events");
+}
+
+export function teamDispatchDir(cwd: string): string {
+  return join(teamDir(cwd), "dispatch");
+}
+
+export function teamInboxDir(cwd: string): string {
+  return join(teamDir(cwd), "inbox");
 }
 
 export function projectName(cwd: string): string {
-  return resolve(cwd).split('/').pop() ?? 'project';
+  return resolve(cwd).split("/").pop() ?? "project";
 }
